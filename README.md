@@ -10,6 +10,20 @@ Find and auto translate translations in your laravel application
 composer require singlequote/laravel-locale-finder
 ```
 
+### Usage
+
+The command can be used from the commandline
+
+For example, find and translate all dutch translation keys
+```bash
+php artisan language:find-and-add --locales=nl
+```
+
+or find and translate the dutch and german translations keys
+```bash
+php artisan language:find-and-add --locales=nl,de
+```
+
 
 ## Contributing
 
