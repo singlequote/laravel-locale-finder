@@ -22,7 +22,9 @@ class LocaleFinderServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        
+        $this->publishes([
+            __DIR__.'/config/config.php' => config_path('locale-finder.php')
+        ], 'locale-finder');
     }
 
     /**
@@ -30,11 +32,17 @@ class LocaleFinderServiceProvider extends ServiceProvider
      */
     public function register()
     {
+        //config
+        $this->mergeConfigFrom(
+            __DIR__ . '/config/config.php',
+            'locale-finder'
+        );
+
         app()->config["filesystems.disks.localeFinder"] = [
             'driver' => 'local',
-            'root' => base_path('lang'),
+            'root' => config('locale-finder.paths.lang_folder'),
         ];
-        
+                
         $this->commands($this->commands);
     }
 }

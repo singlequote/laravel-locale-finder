@@ -15,7 +15,7 @@ class FindAndAddLanguageKeysCommand extends Command
     /**
      * @var  string
      */
-    protected $signature = 'language:find-and-add {--locales=}';
+    protected $signature = 'language:find-and-add {--locales=} {--notranslate}';
 
     /**
      * @var  string
@@ -76,8 +76,9 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function findKeysInFiles(): array
     {
-        $path = [resource_path('views')];
-        $functions = ['\$t', 'i18n.t', '@lang', '__'];
+        $path = config('locale-finder.search.folders');
+        
+        $functions = config('locale-finder.translation_methods');
         $pattern = "[^\w|>]" . // Must not have an alphanum or _ or > before real method
             "(" . implode('|', $functions) . ")" . // Must start with one of the functions
             "\(" . // Match opening parenthese
@@ -88,8 +89,13 @@ class FindAndAddLanguageKeysCommand extends Command
             "[\'\"]" . // Closing quote
             "[\),]";                            // Close parentheses or new parameter
         $finder = new Finder();
-        $finder->in($path)->exclude('storage')->name(['*.php'])->files();
-        $this->info('> ' . $finder->count() . ' php files found');
+        
+        $finder->in($path)->exclude(config('locale-finder.search.exclude'))
+            ->name(config('locale-finder.search.file_extension'))
+            ->files();
+
+        $this->info('> ' . $finder->count() . ' files found');
+        
         $keys = [];
         foreach ($finder as $file) {
             if (preg_match_all("/$pattern/siU", $file->getContents(), $matches)) {
@@ -123,9 +129,8 @@ class FindAndAddLanguageKeysCommand extends Command
                 
                 $old = array_diff_key($alreadyTranslated[$locale], $translationsKeys);
                 
-                $this->info("Removed ".count($old). " keys from $locale");
-                
                 foreach($old as $key => $value){
+                    $this->info("Removed $key keys from '$locale'");
                     unset($alreadyTranslated[$locale][$key]);
                 }
                 
@@ -158,19 +163,26 @@ class FindAndAddLanguageKeysCommand extends Command
             if($keyValue === '...'){
                 continue;
             }
-
+            
             if(Str::contains($keyIndex, ":")){
                 $shouldTranslate = $this->removeVariables($keyIndex);
             }else{
                 $shouldTranslate = $keyIndex;
             }
-            
-            $keys[$keyIndex] = $this->parseVariables($this->translateKey($locale, $shouldTranslate));
+            if($this->option('notranslate', true)){
+                $keys[$keyIndex] = $keyIndex;
+            }else{
+                $keys[$keyIndex] = $this->parseVariables($this->translateKey($locale, $shouldTranslate));
+            }
         }
         
         return $keys;
     }
     
+    /**
+     * @param string $string
+     * @return string
+     */
     private function removeVariables(string $string) : string
     {
         if(Str::contains($string, ":")){
@@ -183,6 +195,10 @@ class FindAndAddLanguageKeysCommand extends Command
         return $string;
     }
     
+    /**
+     * @param string $string
+     * @return string
+     */
     private function parseVariables(string $string) : string
     {
         if(Str::contains($string, "{{")){
