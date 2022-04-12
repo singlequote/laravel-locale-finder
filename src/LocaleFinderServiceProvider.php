@@ -11,7 +11,7 @@ class LocaleFinderServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        dd('yo');
+        
     }
 
     /**
