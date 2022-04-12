@@ -7,6 +7,16 @@ class LocaleFinderServiceProvider extends ServiceProvider
 {
 
     /**
+     * Commands.
+     *
+     * @var array
+     */
+    protected $commands = [
+        InviteAllEmployees::class,
+    ];
+
+    
+    /**
      * Bootstrap the application services.
      */
     public function boot()
@@ -19,6 +29,6 @@ class LocaleFinderServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        
+        $this->commands($this->commands);
     }
 }
