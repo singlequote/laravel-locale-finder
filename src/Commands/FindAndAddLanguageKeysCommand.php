@@ -50,7 +50,7 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function loadAllSavedTranslations(): array
     {
-        $path = Storage::path(base_path('lang'));
+        $path = Storage::disk('localeFinder')->path('');
         $finder = new Finder();
         $finder->in($path)->name(['*.json'])->files();
         $translations = [];
@@ -163,6 +163,6 @@ class FindAndAddLanguageKeysCommand extends Command
     {
         $localeTranslations = array_merge($newKeysWithValues, $alreadyTranslated);
         uksort($localeTranslations, 'strnatcasecmp');
-        Storage::put(base_path("lang/$locale.json"), json_encode($localeTranslations, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        Storage::disk('localeFinder')->put("$locale.json", json_encode($localeTranslations, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
     }
 }

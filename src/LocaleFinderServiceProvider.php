@@ -30,6 +30,11 @@ class LocaleFinderServiceProvider extends ServiceProvider
      */
     public function register()
     {
+        app()->config["filesystems.disks.localeFinder"] = [
+            'driver' => 'local',
+            'root' => base_path('lang'),
+        ];
+        
         $this->commands($this->commands);
     }
 }
