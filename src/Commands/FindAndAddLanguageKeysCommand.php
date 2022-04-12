@@ -7,17 +7,15 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Stichoza\GoogleTranslate\GoogleTranslate;
 use Symfony\Component\Finder\Finder;
+use Illuminate\Support\Str;
 
 class FindAndAddLanguageKeysCommand extends Command
 {
 
-    const STORAGE_DISK = 'lang';
-    const LOCALES = ['nl', 'en', 'de'];
-
     /**
      * @var  string
      */
-    protected $signature = 'language:find-and-add';
+    protected $signature = 'language:find-and-add {--locales=}';
 
     /**
      * @var  string
@@ -38,11 +36,17 @@ class FindAndAddLanguageKeysCommand extends Command
      * 
      */
     public function handle()
-    {
+    {                
+        if(!$this->option('locales')){
+            return $this->info('The --locales option is required! Use as --locales=nl,en,de');
+        }
+        
+        $this->locales = explode(',', $this->option('locales'));
+        
         $alreadyTranslated = $this->loadAllSavedTranslations();
         $translationsKeys = $this->findKeysInFiles();
         $this->translateAndSaveNewKeys($translationsKeys, $alreadyTranslated);
-        $this->info('success');
+        $this->info("Finished");
     }
     
     /**
@@ -56,7 +60,7 @@ class FindAndAddLanguageKeysCommand extends Command
         $translations = [];
         foreach ($finder as $file) {
             $locale = $file->getFilenameWithoutExtension();
-            if (!in_array($locale, self::LOCALES)) {
+            if (!in_array($locale, $this->locales)) {
                 continue;
             }
             $this->info('loading: ' . $locale);
@@ -110,27 +114,97 @@ class FindAndAddLanguageKeysCommand extends Command
      * @param array $translationsKeys
      * @param array $alreadyTranslated
      */
-    private function translateAndSaveNewKeys(array $translationsKeys, array $alreadyTranslated)
-    {
-        foreach (self::LOCALES as $locale) {
-            $newKeysFound = array_diff_key($translationsKeys, $alreadyTranslated[$locale]);
+    private function translateAndSaveNewKeys(array $translationsKeys, array $alreadyTranslated) : void
+    {        
+                        
+        foreach ($this->locales as $locale) {     
+            try{
+                $newKeysFound = array_diff_key($translationsKeys, $alreadyTranslated[$locale]);
+                
+                $old = array_diff_key($alreadyTranslated[$locale], $translationsKeys);
+                
+                $this->info("Removed ".count($old). " keys from $locale");
+                
+                foreach($old as $key => $value){
+                    unset($alreadyTranslated[$locale][$key]);
+                }
+                
+            } catch (\Exception $ex) {
+                $this->error("Could not find the '$locale' translation file");
+                
+                return;
+            }
+            
             if (count($newKeysFound) < 1) {
+                $this->saveToFile($locale, $alreadyTranslated[$locale], $alreadyTranslated[$locale]);
                 continue;
             }
+            
             $this->info(count($newKeysFound) . ' new keys found for "' . $locale . '"');
             $newKeysWithValues = $this->translateKeys($locale, $newKeysFound);
                         
             $this->saveToFile($locale, $newKeysWithValues, $alreadyTranslated[$locale]);
         }
     }
-
+    
+    /**
+     * @param string $locale
+     * @param array $keys
+     * @return array
+     */
     private function translateKeys(string $locale, array $keys): array
     {
         foreach ($keys as $keyIndex => $keyValue) {
-            $keys[$keyIndex] = $this->translateKey($locale, $keyIndex);
-        }
+            if($keyValue === '...'){
+                continue;
+            }
 
+            if(Str::contains($keyIndex, ":")){
+                $shouldTranslate = $this->removeVariables($keyIndex);
+            }else{
+                $shouldTranslate = $keyIndex;
+            }
+            
+            $keys[$keyIndex] = $this->parseVariables($this->translateKey($locale, $shouldTranslate));
+        }
+        
         return $keys;
+    }
+    
+    private function removeVariables(string $string) : string
+    {
+        if(Str::contains($string, ":")){
+            $variable = Str::betweenFirst($string, ":", " ");
+            $replaced = $this->replace(":$variable", "{{".base64_encode($variable)."}}", $string);
+
+            return $this->removeVariables($replaced);
+        }
+        
+        return $string;
+    }
+    
+    private function parseVariables(string $string) : string
+    {
+        if(Str::contains($string, "{{")){
+            $variable = Str::betweenFirst($string, "{{", "}}");
+            
+            $replaced = $this->replace("{{".$variable."}}", ":".base64_decode($variable), $string);
+                        
+            return $this->parseVariables($replaced);
+        }
+                
+        return $string;
+    }
+    
+    /**
+     * @param string $search
+     * @param string $replace
+     * @param string $subject
+     * @return string
+     */
+    private function replace(string $search, string $replace, string $subject) : string 
+    {
+        return implode($replace, explode($search, $subject, 2));
     }
     
     /**
