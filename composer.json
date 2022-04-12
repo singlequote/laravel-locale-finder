@@ -1,0 +1,55 @@
+{
+    "name": "singlequote/laravel-locale-finder",
+    "description": "",
+    "keywords": [
+        "locale",
+        "translations",
+        "auto",
+        "laravel"
+    ],
+    "homepage": "https://github.com/singlequote/laravel-locale-finder",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Wim Pruiksma",
+            "email": "wim@quotec.nl",
+            "homepage": "https://quotec.nl/"
+        }
+    ],
+    "require": {
+        "php": "^8.0",
+        "laravel/framework": ">=9",
+        "stichoza/google-translate-php": "^4.1"
+    },
+    "require-dev": {
+        
+    },
+    "autoload": {
+        "psr-4": {
+            "SingleQuote\\LocaleFinder\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SingleQuote\\LocaleFinder\\Tests\\": "tests"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
+
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "SingleQuote\\LocaleFinder\\LocaleFinderServiceProvider"
+            ],
+            "aliases": {
+                "LocaleFinder": "SingleQuote\\LocaleFinder\\LocaleFinderFacade"
+            }
+        }
+    }
+}
