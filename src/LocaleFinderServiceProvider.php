@@ -2,6 +2,7 @@
 namespace SingleQuote\LocaleFinder;
 
 use Illuminate\Support\ServiceProvider;
+use SingleQuote\LocaleFinder\Commands\FindAndAddLanguageKeysCommand;
 
 class LocaleFinderServiceProvider extends ServiceProvider
 {
@@ -12,7 +13,7 @@ class LocaleFinderServiceProvider extends ServiceProvider
      * @var array
      */
     protected $commands = [
-        InviteAllEmployees::class,
+        FindAndAddLanguageKeysCommand::class,
     ];
 
     
