@@ -1,5 +1,5 @@
 # Laravel Cacher
-A powerful cache trait based on Laravel's file cache driver
+Find and auto translate translations in your laravel application
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/singlequote/laravel-locale-finder.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-locale-finder)
 [![Total Downloads](https://img.shields.io/packagist/dt/singlequote/laravel-locale-finder.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-locale-finder)
