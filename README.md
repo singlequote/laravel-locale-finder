@@ -14,7 +14,7 @@ composer require singlequote/laravel-locale-finder
 The package searches for translations key in your blade files. For example `{{ __("My translation") }}`. Or `@lang('My Translation')`.
 After searching the package will try to translate the keys using the google [translate package](https://github.com/Stichoza/google-translate-php).
 
-When removing translations from your view, the package will also remove the keys from the files.
+> When removing translations from your view, the package will also remove the keys from the files.
 
 The command can be used from the commandline
 
