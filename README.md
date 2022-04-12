@@ -6,7 +6,7 @@ Find and auto translate translations in your laravel application
 
 
 ### Installation
-```bash
+```console
 composer require singlequote/laravel-locale-finder
 ```
 
@@ -19,13 +19,21 @@ After searching the package will try to translate the keys using the google [tra
 The command can be used from the commandline
 
 For example, find and translate all dutch translation keys
-```bash
+```console
 php artisan language:find-and-add --locales=nl
 ```
 
 or find and translate the dutch and german translations keys
-```bash
+```console
 php artisan language:find-and-add --locales=nl,de
+```
+
+#### Disabling translation
+If you would like to just get the keys from your views, you can use the `--notranslate` option.
+This will fill the values with the default keys.
+
+```console
+php artisan language:find-and-add --locales=nl --notranslate
 ```
 
 
