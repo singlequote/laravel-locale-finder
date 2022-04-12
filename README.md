@@ -1,48 +1,15 @@
 # Laravel Cacher
 A powerful cache trait based on Laravel's file cache driver
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/singlequote/laravel-cacher.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-cacher)
-[![Total Downloads](https://img.shields.io/packagist/dt/singlequote/laravel-cacher.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-cacher)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/singlequote/laravel-locale-finder.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-locale-finder)
+[![Total Downloads](https://img.shields.io/packagist/dt/singlequote/laravel-locale-finder.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-locale-finder)
 
 
 ### Installation
 ```bash
-composer require singlequote/laravel-webdav
+composer require singlequote/laravel-locale-finder
 ```
 
-## Usage
-
-### Add a new entry to the config
-
-`config/filesystems.php`
-```php
-
-'disks' => [
-	...
-	'webdav' => [
-	    'driver'     => 'webdav',
-	    'baseUri'    => env("WEBDAV_BASEURL"),
-	    'userName'   => env("WEBDAV_USERNAME"),
-	    'password'   => env("WEBDAV_PASSWORD"),
-	    
-	    //Optional prameters
-	    'proxy'      => env("WEBDAV_PROXY"),
-	    'pathPrefix' => env("WEBDAV_PATHPREFIX"),
-	    'authType'   => env("WEBDAV_AUTHTYPE"),
-	    'encoding'   => env("WEBDAV_ENCODING"),
-	],
-	...
-];
-```
-
-After adding the config entry you can use it in your storage driver.
-
-[Laravel filesystem](https://laravel.com/docs/master/filesystem)
-
-```php
-Storage::disk('webdav')->files('...')
-
-```
 
 ## Contributing
 
