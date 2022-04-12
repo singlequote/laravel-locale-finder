@@ -10,6 +10,13 @@ Find and auto translate translations in your laravel application
 composer require singlequote/laravel-locale-finder
 ```
 
+### Publish config
+You can change the behaviour of the package by editing the config file. Publish the config file with the command below.
+
+```console
+php artisan vendor:publish --tag=locale-finder
+```
+
 ### Usage
 The package searches for translations key in your blade files. For example `{{ __("My translation") }}`. Or `@lang('My Translation')`.
 After searching the package will try to translate the keys using the google [translate package](https://github.com/Stichoza/google-translate-php).
