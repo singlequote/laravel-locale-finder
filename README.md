@@ -27,12 +27,19 @@ The command can be used from the commandline
 
 For example, find and translate all dutch translation keys
 ```console
-php artisan language:find-and-add --locales=nl
+php artisan locale:find --locales=nl
 ```
 
 or find and translate the dutch and german translations keys
 ```console
-php artisan language:find-and-add --locales=nl,de
+php artisan locale:find --locales=nl,de
+```
+
+#### Translate all available locales
+The `all` option will scan your lang folder and select the available .json files.
+
+```console
+php artisan locale:find --locales=all
 ```
 
 #### Disabling translation
@@ -40,7 +47,7 @@ If you would like to just get the keys from your views, you can use the `--notra
 This will fill the values with the default keys.
 
 ```console
-php artisan language:find-and-add --locales=nl --notranslate
+php artisan locale:find --locales=nl --notranslate
 ```
 
 
