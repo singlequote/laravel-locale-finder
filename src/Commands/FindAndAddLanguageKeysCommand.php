@@ -15,7 +15,7 @@ class FindAndAddLanguageKeysCommand extends Command
     /**
      * @var  string
      */
-    protected $signature = 'language:find-and-add {--locales=} {--notranslate}';
+    protected $signature = 'locale:find {--locales=} {--notranslate}';
 
     /**
      * @var  string
