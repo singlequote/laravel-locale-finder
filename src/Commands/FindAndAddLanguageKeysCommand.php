@@ -33,20 +33,43 @@ class FindAndAddLanguageKeysCommand extends Command
     }
     
     /**
-     * 
+     * @return void
      */
-    public function handle()
+    public function handle() : int
     {                
         if(!$this->option('locales')){
-            return $this->info('The --locales option is required! Use as --locales=nl,en,de');
+            $this->info('The --locales option is required! Use as --locales=nl,en,de');
+            return 0;
         }
         
-        $this->locales = explode(',', $this->option('locales'));
-        
+        $this->getTranslationFiles();
+                
         $alreadyTranslated = $this->loadAllSavedTranslations();
         $translationsKeys = $this->findKeysInFiles();
         $this->translateAndSaveNewKeys($translationsKeys, $alreadyTranslated);
         $this->info("Finished");
+        
+        return 1;
+    }
+    
+    /**
+     * @return void
+     */
+    private function getTranslationFiles() : void
+    {
+        if($this->option('locales') !== 'all'){
+            $this->locales = explode(',', $this->option('locales'));
+            return;
+        }
+        
+        $files = Storage::disk('localeFinder')->files();
+        
+        foreach($files as $file){
+            if(Str::endsWith($file, '.json')){
+                $this->locales[] = Str::before($file, '.json');
+            }
+        }
+        
     }
     
     /**
