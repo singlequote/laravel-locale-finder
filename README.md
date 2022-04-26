@@ -1,5 +1,5 @@
 # Laravel Locale Finder
-Find and auto translate translations in your laravel application
+This package finds all translations in your application and auto translates the keys to every language.
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/singlequote/laravel-locale-finder.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-locale-finder)
 [![Total Downloads](https://img.shields.io/packagist/dt/singlequote/laravel-locale-finder.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-locale-finder)
@@ -40,6 +40,12 @@ The `all` option will scan your lang folder and select the available .json files
 
 ```console
 php artisan locale:find --locales=all
+```
+#### Change source
+If you develop your application in a different language you can change the defualt source from `en` to something else.
+
+```console
+php artisan locale:find --locales=nl --source=de
 ```
 
 #### Disabling translation
