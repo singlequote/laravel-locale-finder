@@ -5,9 +5,13 @@ use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Stichoza\GoogleTranslate\GoogleTranslate;
 use Symfony\Component\Finder\Finder;
-use Illuminate\Support\Str;
+use const PHP_EOL;
+use function config;
+use function GuzzleHttp\json_decode;
+use function GuzzleHttp\json_encode;
 
 class FindAndAddLanguageKeysCommand extends Command
 {
@@ -15,14 +19,14 @@ class FindAndAddLanguageKeysCommand extends Command
     /**
      * @var  string
      */
-    protected $signature = 'locale:find {--locales=} {--notranslate}';
+    protected $signature = 'locale:find {--locales=} {--source=en} {--notranslate}';
 
     /**
      * @var  string
      */
     protected $description = 'Automatically find, translate and save missing translation keys.';
     private GoogleTranslate $googleTranslate;
-    
+
     /**
      * @param GoogleTranslate $googleTranslate
      */
@@ -31,76 +35,78 @@ class FindAndAddLanguageKeysCommand extends Command
         $this->googleTranslate = $googleTranslate;
         parent::__construct();
     }
-    
+
     /**
      * @return void
      */
-    public function handle() : int
-    {                
-        if(!$this->option('locales')){
+    public function handle(): int
+    {
+        if (!$this->option('locales')) {
             $this->info('The --locales option is required! Use as --locales=nl,en,de');
             return 0;
         }
-        
+
         $this->getTranslationFiles();
-                
-        $alreadyTranslated = $this->loadAllSavedTranslations();
+
         $translationsKeys = $this->findKeysInFiles();
-        $this->translateAndSaveNewKeys($translationsKeys, $alreadyTranslated);
+
+        $this->translateAndSaveNewKeys($translationsKeys);
         $this->info("Finished");
-        
+
         return 1;
     }
-    
+
     /**
      * @return void
      */
-    private function getTranslationFiles() : void
+    private function getTranslationFiles(): void
     {
-        if($this->option('locales') !== 'all'){
+        if ($this->option('locales') !== 'all') {
             $this->locales = explode(',', $this->option('locales'));
             return;
         }
-        
+
         $files = Storage::disk('localeFinder')->files();
-        
-        foreach($files as $file){
-            if(Str::endsWith($file, '.json')){
+
+        foreach ($files as $file) {
+            if (Str::endsWith($file, '.json')) {
                 $this->locales[] = Str::before($file, '.json');
             }
         }
-        
     }
-    
+
     /**
+     * @param string $locale
      * @return array
      */
-    private function loadAllSavedTranslations(): array
+    private function loadJsonTranslationFile(string $locale): array
     {
-        $path = Storage::disk('localeFinder')->path('');
-        $finder = new Finder();
-        $finder->in($path)->name(['*.json'])->files();
-        $translations = [];
-        foreach ($finder as $file) {
-            $locale = $file->getFilenameWithoutExtension();
-            if (!in_array($locale, $this->locales)) {
-                continue;
-            }
-            $this->info('loading: ' . $locale);
-            $jsonString = $file->getContents();
-            $translations[$locale] = json_decode($jsonString, true);
-        }
-
-        return $translations;
+        $this->info("Loading: $locale");
+        
+        $file = Storage::disk('localeFinder')->get("$locale.json");
+        
+        return json_decode($file, true);
     }
-    
+
+    /**
+     * @param string $locale
+     * @param string $file
+     * @return array
+     */
+    private function loadPhpTranslationFile(string $locale, string $file): array
+    {
+        $this->info("Loading: $locale/$file");
+        
+        return require Storage::disk('localeFinder')->path("$locale/$file.php");
+    }
+
     /**
      * @return array
      */
     private function findKeysInFiles(): array
     {
         $path = config('locale-finder.search.folders');
-        
+
         $functions = config('locale-finder.translation_methods');
         $pattern = "[^\w|>]" . // Must not have an alphanum or _ or > before real method
             "(" . implode('|', $functions) . ")" . // Must start with one of the functions
@@ -111,21 +117,35 @@ class FindAndAddLanguageKeysCommand extends Command
             ")" . // Close group
             "[\'\"]" . // Closing quote
             "[\),]";                            // Close parentheses or new parameter
+
         $finder = new Finder();
-        
+
         $finder->in($path)->exclude(config('locale-finder.search.exclude'))
             ->name(config('locale-finder.search.file_extension'))
             ->files();
 
         $this->info('> ' . $finder->count() . ' files found');
-        
+
+        return $this->patternKeys($finder, $pattern);
+    }
+
+    /**
+     * @param Finder $finder
+     * @param string $pattern
+     * @return array
+     */
+    private function patternKeys(Finder $finder, string $pattern): array
+    {
         $keys = [];
         foreach ($finder as $file) {
             if (preg_match_all("/$pattern/siU", $file->getContents(), $matches)) {
+
                 if (count($matches) < 2) {
                     continue;
                 }
-                $this->info('>> ' . count($matches[2]) . ' keys found for ' . $file->getFilename());
+
+//                $this->info('>> ' . count($matches[2]) . ' keys found for ' . $file->getFilename());
+
                 foreach ($matches[2] as $key) {
                     if (strlen($key) < 2) {
                         continue;
@@ -134,47 +154,160 @@ class FindAndAddLanguageKeysCommand extends Command
                 }
             }
         }
+
         uksort($keys, 'strnatcasecmp');
 
         return $keys;
     }
-    
+
     /**
      * @param array $translationsKeys
-     * @param array $alreadyTranslated
+     * @return void
      */
-    private function translateAndSaveNewKeys(array $translationsKeys, array $alreadyTranslated) : void
-    {        
-                        
-        foreach ($this->locales as $locale) {     
-            try{
-                $newKeysFound = array_diff_key($translationsKeys, $alreadyTranslated[$locale]);
+    private function translateAndSaveNewKeys(array $translationsKeys): void
+    {
+        foreach ($this->locales as $locale) {
+            
+            $types = $this->parseKeys($locale, $translationsKeys);
+            
+            foreach($types as $type => $keys){
                 
-                $old = array_diff_key($alreadyTranslated[$locale], $translationsKeys);
-                
-                foreach($old as $key => $value){
-                    $this->info("Removed $key keys from '$locale'");
-                    unset($alreadyTranslated[$locale][$key]);
+                if($type === 'json'){
+                    $this->parseJsonKeys($locale, $keys);
+                    continue;
                 }
                 
-            } catch (\Exception $ex) {
-                $this->error("Could not find the '$locale' translation file");
-                
-                return;
+                $this->parsePhpArrayKeys($locale, $type, $keys);                
             }
-            
-            if (count($newKeysFound) < 1) {
-                $this->saveToFile($locale, $alreadyTranslated[$locale], $alreadyTranslated[$locale]);
-                continue;
-            }
-            
-            $this->info(count($newKeysFound) . ' new keys found for "' . $locale . '"');
-            $newKeysWithValues = $this->translateKeys($locale, $newKeysFound);
-                        
-            $this->saveToFile($locale, $newKeysWithValues, $alreadyTranslated[$locale]);
         }
     }
     
+    /**
+     * @param string $locale
+     * @param array $keys
+     * @return void
+     */
+    private function parseJsonKeys(string $locale, array $keys) : void
+    {
+        $alreadyTranslated = $this->loadJsonTranslationFile($locale);
+        
+        $old = $this->checkDiffMulti($alreadyTranslated, $keys);
+
+        $this->info("Removed ".count($old). " old keys from locale $locale");
+        
+        $existingKeys = $this->removeOldKeys($alreadyTranslated, $old);
+        
+        $translationsKeys = $this->checkDiffMulti($keys, $existingKeys);
+
+        $newKeysWithValues = $this->translateKeys($locale, $translationsKeys);
+        
+        $this->info("Found ".count($newKeysWithValues). " new keys for locale $locale");
+        
+        $newKeys = array_merge_recursive($existingKeys, $newKeysWithValues);
+        
+        uksort($newKeys, 'strnatcasecmp');
+        Storage::disk('localeFinder')->put("$locale.json", json_encode($newKeys, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+    }
+    
+    /**
+     * @param string $locale
+     * @param string $file
+     * @param array $keys
+     * @return void
+     */
+    private function parsePhpArrayKeys(string $locale, string $file, array $keys) : void
+    {
+        $alreadyTranslated = $this->loadPhpTranslationFile($locale, $file);
+
+        $old = $this->checkDiffMulti($alreadyTranslated, $keys);
+        
+        $this->info("Removed ".count($old). " old keys from locale $locale");
+        
+        $existingKeys = $this->removeOldKeys($alreadyTranslated, $old);
+        
+        $translationsKeys = $this->checkDiffMulti($keys, $existingKeys);
+        
+        $newKeysWithValues = $this->translateKeys($locale, $translationsKeys);
+
+        $this->info("Found ".count($newKeysWithValues). " new keys for locale $locale");
+        
+        $newKeys = array_merge_recursive($existingKeys, $newKeysWithValues);
+                     
+        uksort($newKeys, 'strnatcasecmp');
+        
+        $export = $this->varexport($newKeys);
+        
+        $code = "<?php ".PHP_EOL.PHP_EOL."return $export;";
+        
+        file_put_contents(Storage::disk('localeFinder')->path("$locale/$file.php"), $code);
+    }
+    
+    /**
+     * @param string $locale
+     * @param array $newKeysFound
+     * @return array
+     */
+    private function parseKeys(string $locale, array $newKeysFound) : array
+    {
+        $items = [];
+        
+        foreach ($newKeysFound as $key => $value) {
+             
+            $parent = Str::before($key, '.');
+            $child = Str::after($key, '.');
+            
+            if (!Str::contains(rtrim($key, '.'), '.') || Str::startsWith($child, ' ')) {
+                $items['json'][$key] = $value;
+                continue;
+            }
+
+            if ($this->parentExists($locale, $parent)) {
+                
+                $parsed = $this->createParentKeys($child, $value, []);
+                
+                $items[$parent] = array_merge_recursive($parsed, $items[$parent] ?? []);
+            }else{
+                $items['json'][$key] = $value;
+            }
+        }
+        
+        return $items;
+    }
+
+    /**
+     * @param string $key
+     * @param string $value
+     * @return array
+     */
+    private function createParentKeys(string $key, string $value): array
+    {      
+        $parent = Str::before($key, '.');
+        $child = Str::after($key, '.');
+        
+        if (!Str::contains(rtrim($key, '.'), '.') || Str::startsWith($child, ' ')) {
+            return [$key => $value];
+        }
+        
+        if (Str::contains(rtrim($child, '.'), '.')) {
+                        
+            $child = $this->createParentKeys($child, $value);
+        }else{
+            $child = [$child => $value];
+        }
+        
+        return [$parent => $child];
+    }
+
+    /**
+     * @param string $locale
+     * @param string $parent
+     * @return bool
+     */
+    private function parentExists(string $locale, string $parent): bool
+    {
+        return Storage::disk('localeFinder')->exists("$locale/$parent.php");
+    }
+
     /**
      * @param string $locale
      * @param array $keys
@@ -183,69 +316,74 @@ class FindAndAddLanguageKeysCommand extends Command
     private function translateKeys(string $locale, array $keys): array
     {
         foreach ($keys as $keyIndex => $keyValue) {
-            if($keyValue === '...'){
+            if ($keyValue === '...') {
                 continue;
             }
-            
-            if(Str::contains($keyIndex, ":")){
+
+            if (is_array($keyValue)) {
+                $keys[$keyIndex] = $this->translateKeys($locale, $keyValue);
+                continue;
+            }
+
+            if (Str::contains($keyIndex, ":")) {
                 $shouldTranslate = $this->removeVariables($keyIndex);
-            }else{
+            } else {
                 $shouldTranslate = $keyIndex;
             }
-            if($this->option('notranslate', true)){
+            if ($this->option('notranslate', true)) {
                 $keys[$keyIndex] = $keyIndex;
-            }else{
+            } else {
                 $keys[$keyIndex] = $this->parseVariables($this->translateKey($locale, $shouldTranslate));
             }
         }
-        
+
         return $keys;
     }
-    
+
     /**
      * @param string $string
      * @return string
      */
-    private function removeVariables(string $string) : string
+    private function removeVariables(string $string): string
     {
-        if(Str::contains($string, ":")){
+        if (Str::contains($string, ":")) {
             $variable = Str::betweenFirst($string, ":", " ");
-            $replaced = $this->replace(":$variable", "{{".base64_encode($variable)."}}", $string);
+            $replaced = $this->replace(":$variable", "{{" . base64_encode($variable) . "}}", $string);
 
             return $this->removeVariables($replaced);
         }
-        
+
         return $string;
     }
-    
+
     /**
      * @param string $string
      * @return string
      */
-    private function parseVariables(string $string) : string
+    private function parseVariables(string $string): string
     {
-        if(Str::contains($string, "{{")){
+        if (Str::contains($string, "{{")) {
             $variable = Str::betweenFirst($string, "{{", "}}");
-            
-            $replaced = $this->replace("{{".$variable."}}", ":".base64_decode($variable), $string);
-                        
+
+            $replaced = $this->replace("{{" . $variable . "}}", ":" . base64_decode($variable), $string);
+
             return $this->parseVariables($replaced);
         }
-                
+
         return $string;
     }
-    
+
     /**
      * @param string $search
      * @param string $replace
      * @param string $subject
      * @return string
      */
-    private function replace(string $search, string $replace, string $subject) : string 
+    private function replace(string $search, string $replace, string $subject): string
     {
         return implode($replace, explode($search, $subject, 2));
     }
-    
+
     /**
      * @param string $locale
      * @param string $key
@@ -253,10 +391,8 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function translateKey(string $locale, string $key): string
     {
-        if ($locale === 'en') {
-            return $key;
-        }
         try {
+            $this->googleTranslate->setSource($this->option('source'));
             $this->googleTranslate->setTarget($locale);
             $translated = $this->googleTranslate->translate($key);
         } catch (Exception $exception) {
@@ -268,14 +404,75 @@ class FindAndAddLanguageKeysCommand extends Command
     }
     
     /**
-     * @param string $locale
-     * @param array $newKeysWithValues
-     * @param array $alreadyTranslated
+     * @param array $current
+     * @param array $old
+     * @return array
      */
-    private function saveToFile(string $locale, array $newKeysWithValues, array $alreadyTranslated)
+    private function removeOldKeys(array $current, array $old) : array
     {
-        $localeTranslations = array_merge($newKeysWithValues, $alreadyTranslated);
-        uksort($localeTranslations, 'strnatcasecmp');
-        Storage::disk('localeFinder')->put("$locale.json", json_encode($localeTranslations, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        foreach($old as $key => $value){
+            
+            if(isset($current[$key]) && is_array($current[$key])){
+                $current[$key] = $this->removeOldKeys($current[$key], $old[$key]);
+                
+                if(!count($current[$key])){
+                    unset($current[$key]);
+                }
+                
+                continue;
+            }
+            
+            if(isset($current[$key])){
+                unset($current[$key]);
+            }
+        }
+        
+        return $current;
+    }
+    
+    /**
+     * @param array $expression
+     * @return string
+     */
+    private function varexport(array $expression) : string
+    {
+        $export = var_export($expression, true);
+        
+        $patterns = [
+            "/array \(/" => '[',
+            "/^([ ]*)\)(,?)$/m" => '$1]$2',
+            "/=>[ ]?\n[ ]+\[/" => '=> [',
+            "/([ ]*)(\'[^\']+\') => ([\[\'])/" => '$1$2 => $3',
+        ];
+        
+        $replace = preg_replace(array_keys($patterns), array_values($patterns), $export);
+
+        return $replace;
+    }
+    
+    /**
+     * 
+     * @param array $array1
+     * @param array $array2
+     * @return array
+     */
+    private function checkDiffMulti(array $array1, array $array2): array
+    {
+        $result = [];
+        
+        foreach($array1 as $key => $value){
+
+            if(isset($array2[$key]) && is_array($value) && is_array($array2[$key])){
+             
+                $result[$key] = $this->checkDiffMulti($array1[$key], $array2[$key]);
+                continue;
+            }
+                        
+            if(!isset($array2[$key])){
+                $result[$key] = $value;
+            }
+        }
+        
+        return $result;
     }
 }
