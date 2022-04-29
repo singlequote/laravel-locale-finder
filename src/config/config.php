@@ -64,6 +64,7 @@ return [
         'i18n.t',
         '@lang',
         '__',
+        'trans_choice',
     ]
     
 ];
