@@ -48,7 +48,7 @@ If you develop your application in a different language you can change the defua
 php artisan locale:find --locales=nl --source=de
 ```
 
-#### Disabling translation
+#### Disabling key translations
 If you would like to just get the keys from your views, you can use the `--notranslate` option.
 This will fill the values with the default keys.
 
@@ -56,6 +56,26 @@ This will fill the values with the default keys.
 php artisan locale:find --locales=nl --notranslate
 ```
 
+#### Create missing php key files
+When adding new translations keys such as `__("newkey.some text")` the file `newkey.php` should exists in order to add the translation keys.
+When using the `--create` option the package will auto generate these files.
+
+```console
+php artisan locale:find --create
+```
+
+### Beta
+
+#### Modules
+When using modules in your laravel package with their own lang folder, you would like to add the keys to the right files in the module folders.
+
+So for example when we have a module called `Horses` and we loaded the translations using `$this->loadTranslationsFrom(PATHTOTRANS, "horses");` in our Service provider. The key should be something like this : `__("horses::")` and with a translation `__("horsed.colors.red")` where `colors.php` is the file.
+
+When using the `--modules` option, the package will auto detect the loaded translation files and adds the keys to the right files.
+
+```console
+php artisan locale:find --modules
+```
 
 ## Contributing
 
