@@ -1,5 +1,5 @@
-# Laravel Locale Finder
-This package finds all translations in your application and auto translates the keys to every language.
+# Laravel Translation Finder
+Find all translation keys in your blades, scripts, files etc. and translate to the given language.
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/singlequote/laravel-locale-finder.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-locale-finder)
 [![Total Downloads](https://img.shields.io/packagist/dt/singlequote/laravel-locale-finder.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-locale-finder)
