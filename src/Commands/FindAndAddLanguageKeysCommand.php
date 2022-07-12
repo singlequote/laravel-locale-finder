@@ -3,6 +3,8 @@ namespace SingleQuote\LocaleFinder\Commands;
 
 use Exception;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -10,8 +12,7 @@ use Stichoza\GoogleTranslate\GoogleTranslate;
 use Symfony\Component\Finder\Finder;
 use const PHP_EOL;
 use function config;
-use function GuzzleHttp\json_decode;
-use function GuzzleHttp\json_encode;
+use function str;
 
 class FindAndAddLanguageKeysCommand extends Command
 {
@@ -19,7 +20,7 @@ class FindAndAddLanguageKeysCommand extends Command
     /**
      * @var  string
      */
-    protected $signature = 'locale:find {--locales=} {--source=en} {--notranslate}';
+    protected $signature = 'locale:find {--locales=all} {--source=en} {--notranslate} {--modules} {--create}';
 
     /**
      * @var  string
@@ -42,15 +43,16 @@ class FindAndAddLanguageKeysCommand extends Command
     public function handle(): int
     {
         if (!$this->option('locales')) {
-            $this->info('The --locales option is required! Use as --locales=nl,en,de');
+            $this->error('The --locales option is required! Use as --locales=nl,en,de');
             return 0;
         }
-
+        
         $this->getTranslationFiles();
 
         $translationsKeys = $this->findKeysInFiles();
 
         $this->translateAndSaveNewKeys($translationsKeys);
+        
         $this->info("Finished");
 
         return 1;
@@ -96,6 +98,18 @@ class FindAndAddLanguageKeysCommand extends Command
     private function loadPhpTranslationFile(string $locale, string $file): array
     {
         $this->info("Loading: $locale/$file");
+                
+        if($this->option('modules') && str($file)->contains('::')){
+            
+            $hintPaths = Lang::getLoader()->namespaces();
+            
+            $namespace = str($file)->before('::')->toString();
+            $file = str($file)->after('::')->toString();
+                        
+            if(isset($hintPaths[$namespace])){
+                return require "$hintPaths[$namespace]/$locale/$file.php";
+            }
+        }
         
         return require Storage::disk('localeFinder')->path("$locale/$file.php");
     }
@@ -169,7 +183,7 @@ class FindAndAddLanguageKeysCommand extends Command
         foreach ($this->locales as $locale) {
             
             $types = $this->parseKeys($locale, $translationsKeys);
-            
+
             foreach($types as $type => $keys){
                 
                 if($type === 'json'){
@@ -218,7 +232,7 @@ class FindAndAddLanguageKeysCommand extends Command
     private function parsePhpArrayKeys(string $locale, string $file, array $keys) : void
     {
         $alreadyTranslated = $this->loadPhpTranslationFile($locale, $file);
-
+        
         $old = $this->checkDiffMulti($alreadyTranslated, $keys);
         
         $this->info("Removed ".count($old). " old keys from locale $locale");
@@ -238,8 +252,27 @@ class FindAndAddLanguageKeysCommand extends Command
         $export = $this->varexport($newKeys);
         
         $code = "<?php ".PHP_EOL.PHP_EOL."return $export;";
+
+        if($this->option('modules') && str($file)->contains('::')){
+            $this->parsePhpModuleKeys($locale, $file, $code);
+        }else{
+            file_put_contents(Storage::disk('localeFinder')->path("$locale/$file.php"), $code);
+        }        
+    }
+    
+    /**
+     * @param string $locale
+     * @param string $parent
+     * @param string $code
+     */
+    private function parsePhpModuleKeys(string $locale, string $parent, string $code)
+    {
+        $hintPaths = Lang::getLoader()->namespaces();
+            
+        $namespace = str($parent)->before('::')->toString();
+        $file = str($parent)->after('::')->toString();
         
-        file_put_contents(Storage::disk('localeFinder')->path("$locale/$file.php"), $code);
+        file_put_contents("$hintPaths[$namespace]/$locale/$file.php", $code);
     }
     
     /**
@@ -256,21 +289,21 @@ class FindAndAddLanguageKeysCommand extends Command
             $parent = Str::before($key, '.');
             $child = Str::after($key, '.');
             
-            if (!Str::contains(rtrim($key, '.'), '.') || Str::startsWith($child, ' ')) {
+            if (!Str::contains(rtrim($key, '.'), ['.', "::"]) || Str::startsWith($child, ' ')) {
                 $items['json'][$key] = $value;
                 continue;
             }
 
             if ($this->parentExists($locale, $parent)) {
-                
                 $parsed = $this->createParentKeys($child, $value, []);
                 
                 $items[$parent] = array_merge_recursive($parsed, $items[$parent] ?? []);
             }else{
                 $items['json'][$key] = $value;
+                $this->error("Translation file $parent does not exists. Adding to json file!");
             }
         }
-        
+                
         return $items;
     }
 
@@ -305,9 +338,35 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function parentExists(string $locale, string $parent): bool
     {
-        return Storage::disk('localeFinder')->exists("$locale/$parent.php");
+        if($this->option('modules') && str($parent)->contains('::')){
+            
+            $hintPaths = Lang::getLoader()->namespaces();
+            
+            $namespace = str($parent)->before('::')->toString();
+            $parent = str($parent)->after('::')->toString();
+            
+            if(isset($hintPaths[$namespace])){
+                return $this->createOrStay("$hintPaths[$namespace]/$locale/$parent.php");
+            }
+        }
+        
+        return $this->createOrStay(Storage::disk('localeFinder')->path("$locale/$parent.php"));
     }
 
+    
+    private function createOrStay($path) : bool
+    {
+        $exists = File::exists($path);
+        
+        if(!$this->option('create')){
+            return $exists;
+        }
+                
+        $export = $this->varexport([]);
+        
+        return File::put($path, "<?php ".PHP_EOL.PHP_EOL."return $export;");
+    }
+    
     /**
      * @param string $locale
      * @param array $keys
