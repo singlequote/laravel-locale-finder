@@ -264,14 +264,15 @@ class FindAndAddLanguageKeysCommand extends Command
      * @param string $locale
      * @param string $parent
      * @param string $code
+     * @return void
      */
-    private function parsePhpModuleKeys(string $locale, string $parent, string $code)
+    private function parsePhpModuleKeys(string $locale, string $parent, string $code) : void
     {
         $hintPaths = Lang::getLoader()->namespaces();
             
         $namespace = str($parent)->before('::')->toString();
         $file = str($parent)->after('::')->toString();
-        
+
         file_put_contents("$hintPaths[$namespace]/$locale/$file.php", $code);
     }
     
@@ -353,15 +354,18 @@ class FindAndAddLanguageKeysCommand extends Command
         return $this->createOrStay(Storage::disk('localeFinder')->path("$locale/$parent.php"));
     }
 
-    
-    private function createOrStay($path) : bool
+    /**
+     * @param string $path
+     * @return bool
+     */
+    private function createOrStay(string $path) : bool
     {
         $exists = File::exists($path);
         
-        if(!$this->option('create')){
+        if(!$this->option('create') || $exists){
             return $exists;
         }
-                
+        
         $export = $this->varexport([]);
         
         return File::put($path, "<?php ".PHP_EOL.PHP_EOL."return $export;");
