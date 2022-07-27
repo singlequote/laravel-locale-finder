@@ -6,8 +6,9 @@ Find all translation keys in your blades, scripts, files etc. and translate to t
 
 
 ### Installation
+Install the package using composer. Save the package to the dev section for the package is only needed when developing your project. If you need it on your production, remove the `--dev` option.
 ```console
-composer require singlequote/laravel-locale-finder
+composer require singlequote/laravel-locale-finder --dev
 ```
 
 ### Publish config
