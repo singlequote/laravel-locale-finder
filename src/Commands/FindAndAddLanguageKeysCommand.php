@@ -87,8 +87,8 @@ class FindAndAddLanguageKeysCommand extends Command
         $this->info("Loading: $locale");
         
         $file = Storage::disk('localeFinder')->get("$locale.json");
-        
-        return json_decode($file, true);
+
+        return json_decode($file, true) ?? [];
     }
 
     /**
