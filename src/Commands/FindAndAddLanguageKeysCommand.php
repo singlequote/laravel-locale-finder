@@ -51,9 +51,7 @@ class FindAndAddLanguageKeysCommand extends Command
         $this->getTranslationFiles();
 
         $translationsKeys = $this->findKeysInFiles();
-        
-        dd($translationsKeys);
-        
+                
         $this->translateAndSaveNewKeys($translationsKeys);
         
         $this->info("Finished");
