@@ -20,7 +20,7 @@ class FindAndAddLanguageKeysCommand extends Command
     /**
      * @var  string
      */
-    protected $signature = 'locale:find {--locales=all} {--source=en} {--notranslate} {--modules} {--create}';
+    protected $signature = 'locale:find {--locales=all} {--source=en} {--notranslate} {--modules} {--create} {--only=}';
 
     /**
      * @var  string
@@ -34,6 +34,7 @@ class FindAndAddLanguageKeysCommand extends Command
     public function __construct(GoogleTranslate $googleTranslate)
     {
         $this->googleTranslate = $googleTranslate;
+        
         parent::__construct();
     }
 
@@ -46,11 +47,13 @@ class FindAndAddLanguageKeysCommand extends Command
             $this->error('The --locales option is required! Use as --locales=nl,en,de');
             return 0;
         }
-        
+                
         $this->getTranslationFiles();
 
         $translationsKeys = $this->findKeysInFiles();
-
+        
+        dd($translationsKeys);
+        
         $this->translateAndSaveNewKeys($translationsKeys);
         
         $this->info("Finished");
@@ -158,8 +161,6 @@ class FindAndAddLanguageKeysCommand extends Command
                     continue;
                 }
 
-//                $this->info('>> ' . count($matches[2]) . ' keys found for ' . $file->getFilename());
-
                 foreach ($matches[2] as $key) {
                     if (strlen($key) < 2) {
                         continue;
@@ -170,8 +171,45 @@ class FindAndAddLanguageKeysCommand extends Command
         }
 
         uksort($keys, 'strnatcasecmp');
+        
+        return $this->onlyExcept($keys);
+    }
 
-        return $keys;
+    /**
+     * @param array $keys
+     * @return array
+     */
+    private function onlyExcept(array $keys) : array
+    {
+        if(!$this->options('only')){
+            return $keys;
+        }
+                
+        $only = explode(',', $this->option('only'));
+        
+        return collect($keys)->filter(function($value, $key) use($only){
+            
+            return $this->filterOnlyOnPrefix($key, $only);
+        })->toArray();
+    }
+    
+    /**
+     * @param string $key
+     * @param array $only
+     * @param bool $keep
+     * @return bool
+     */
+    private function filterOnlyOnPrefix(string $key, array $only, bool $keep = false) : bool
+    {            
+        foreach($only as $prefix){
+            if(str($prefix)->endsWith('*') && str($key)->startsWith(str($prefix)->before('*')->toString())){
+                $keep = true;
+            }elseif($prefix === $key){
+                $keep = true;
+            }
+        }
+        
+        return $keep;
     }
 
     /**
