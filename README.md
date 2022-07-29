@@ -1,3 +1,4 @@
+
 # Laravel Translation Finder
 Find all translation keys in your blades, scripts, files etc. and translate to the given language.
 
@@ -55,6 +56,36 @@ This will fill the values with the default keys.
 
 ```console
 php artisan locale:find --locales=nl --notranslate
+```
+#### Exclude keys
+If you want the package to only search for specific translation keys, you can use the `--only` option.
+This will exclude everthing outside the `--only` scope.
+```console
+php artisan locale:find --locales=nl --only=app
+```
+The above will exclude every translation key that doesn't belong in the `app` directive.
+
+For example: 
+```php
+__("app.this will be included");
+__("users.i am not included");
+```
+
+**Add multiple only keys to your command**
+```console
+php artisan locale:find --locales=nl --only=app,users
+```
+**Using patterns**
+When using modules or large translation files, it can be a lot of work to fill the `--only` option with all keys.
+You can use the `*` pattern to include keys. For example if you execute the command below:
+```console
+php artisan locale:find --locales=nl --only=user*
+```
+```php
+__("users.i am included");
+__("user.i am also included");
+__("username.i am also included!");
+__("use.i am not included :-(");
 ```
 
 #### Create missing php key files
