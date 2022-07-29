@@ -51,7 +51,7 @@ class FindAndAddLanguageKeysCommand extends Command
         $this->getTranslationFiles();
 
         $translationsKeys = $this->findKeysInFiles();
-                
+
         $this->translateAndSaveNewKeys($translationsKeys);
         
         $this->info("Finished");
@@ -179,14 +179,13 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function onlyExcept(array $keys) : array
     {
-        if(!$this->options('only')){
+        if(!$this->option('only')){
             return $keys;
         }
-                
+                        
         $only = explode(',', $this->option('only'));
         
         return collect($keys)->filter(function($value, $key) use($only){
-            
             return $this->filterOnlyOnPrefix($key, $only);
         })->toArray();
     }
