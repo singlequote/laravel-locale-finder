@@ -76,6 +76,7 @@ __("users.i am not included");
 php artisan locale:find --locales=nl --only=app,users
 ```
 **Using patterns**
+
 When using modules or large translation files, it can be a lot of work to fill the `--only` option with all keys.
 You can use the `*` pattern to include keys. For example if you execute the command below:
 ```console
