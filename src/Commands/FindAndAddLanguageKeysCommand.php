@@ -134,11 +134,11 @@ class FindAndAddLanguageKeysCommand extends Command
             "[\),]";                            // Close parentheses or new parameter
 
         $finder = new Finder();
-
+        
         $finder->in($path)->exclude(config('locale-finder.search.exclude'))
             ->name(config('locale-finder.search.file_extension'))
             ->files();
-
+                        
         $this->info('> ' . $finder->count() . ' files found');
 
         return $this->patternKeys($finder, $pattern);
@@ -152,26 +152,45 @@ class FindAndAddLanguageKeysCommand extends Command
     private function patternKeys(Finder $finder, string $pattern): array
     {
         $keys = [];
+        
         foreach ($finder as $file) {
-            if (preg_match_all("/$pattern/siU", $file->getContents(), $matches)) {
-
-                if (count($matches) < 2) {
-                    continue;
-                }
-
-                foreach ($matches[2] as $key) {
-                    if (strlen($key) < 2) {
-                        continue;
-                    }
-                    $keys[$key] = '';
-                }
-            }
+            $this->matchPatternKeysByContent($pattern, $keys, $file->getContents());
         }
-
+        
+        foreach (config('locale-finder.search.files') as $file) {
+            $this->matchPatternKeysByContent($pattern, $keys, file_get_contents($file));
+        }
+        
         uksort($keys, 'strnatcasecmp');
         
         return $this->onlyExcept($keys);
     }
+    
+    /**
+     * @param string $pattern
+     * @param array $keys
+     * @param string $content
+     * @return array
+     */
+    private function matchPatternKeysByContent(string $pattern, array &$keys, string $content) : array
+    {
+        if (preg_match_all("/$pattern/siU", $content, $matches)) {
+            if (count($matches) < 2) {
+                return $keys;
+            }
+
+            foreach ($matches[2] as $key) {
+                if (strlen($key) < 2) {
+                    return $keys;
+                }
+                
+                $keys[$key] = '';
+            }
+        }
+        
+        return $keys;
+    }
+    
 
     /**
      * @param array $keys
