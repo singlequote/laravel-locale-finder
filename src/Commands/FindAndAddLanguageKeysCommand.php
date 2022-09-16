@@ -120,9 +120,9 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function findKeysInFiles(): array
     {
-        $path = config('locale-finder.search.folders');
+        $path = config('locale-finder.search.folders', []);
 
-        $functions = config('locale-finder.translation_methods');
+        $functions = config('locale-finder.translation_methods', []);
         $pattern = "[^\w|>]" . // Must not have an alphanum or _ or > before real method
             "(" . implode('|', $functions) . ")" . // Must start with one of the functions
             "\(" . // Match opening parenthese
@@ -135,8 +135,8 @@ class FindAndAddLanguageKeysCommand extends Command
 
         $finder = new Finder();
         
-        $finder->in($path)->exclude(config('locale-finder.search.exclude'))
-            ->name(config('locale-finder.search.file_extension'))
+        $finder->in($path)->exclude(config('locale-finder.search.exclude', []))
+            ->name(config('locale-finder.search.file_extension', []))
             ->files();
                         
         $this->info('> ' . $finder->count() . ' files found');
@@ -157,7 +157,7 @@ class FindAndAddLanguageKeysCommand extends Command
             $this->matchPatternKeysByContent($pattern, $keys, $file->getContents());
         }
         
-        foreach (config('locale-finder.search.files') as $file) {
+        foreach (config('locale-finder.search.files', []) as $file) {
             $this->matchPatternKeysByContent($pattern, $keys, file_get_contents($file));
         }
         
