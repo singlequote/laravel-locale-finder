@@ -274,6 +274,11 @@ class FindAndAddLanguageKeysCommand extends Command
         $newKeys = array_merge_recursive($existingKeys, $newKeysWithValues);
         
         uksort($newKeys, 'strnatcasecmp');
+        
+        foreach($newKeys as $key => $value){
+            $newKeys[$key] = utf8_encode($value);
+        }
+        
         Storage::disk('localeFinder')->put("$locale.json", json_encode($newKeys, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
     }
     
