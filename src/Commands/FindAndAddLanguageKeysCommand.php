@@ -275,9 +275,9 @@ class FindAndAddLanguageKeysCommand extends Command
         
         uksort($newKeys, 'strnatcasecmp');
         
-        foreach($newKeys as $key => $value){
-            $newKeys[$key] = utf8_encode($value);
-        }
+//        foreach($newKeys as $key => $value){
+//            $newKeys[$key] = utf8_encode($value);
+//        }
         
         Storage::disk('localeFinder')->put("$locale.json", json_encode($newKeys, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
     }
@@ -406,18 +406,18 @@ class FindAndAddLanguageKeysCommand extends Command
             $parent = str($parent)->after('::')->toString();
             
             if(isset($hintPaths[$namespace])){
-                return $this->createOrStay("$hintPaths[$namespace]/$locale/$parent.php");
+                return $this->createOrStay("$hintPaths[$namespace]/$locale", "$hintPaths[$namespace]/$locale/$parent.php");
             }
         }
-        
-        return $this->createOrStay(Storage::disk('localeFinder')->path("$locale/$parent.php"));
+
+        return $this->createOrStay(Storage::disk('localeFinder')->path("$locale"), Storage::disk('localeFinder')->path("$locale/$parent.php"));
     }
 
     /**
      * @param string $path
      * @return bool
      */
-    private function createOrStay(string $path) : bool
+    private function createOrStay(string $root, string $path) : bool
     {
         $exists = File::exists($path);
         
@@ -426,6 +426,10 @@ class FindAndAddLanguageKeysCommand extends Command
         }
         
         $export = $this->varexport([]);
+        
+        if(!File::isDirectory($root)){
+            File::makeDirectory($root, 0755, true);
+        }
         
         return File::put($path, "<?php ".PHP_EOL.PHP_EOL."return $export;");
     }
