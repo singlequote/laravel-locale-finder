@@ -162,7 +162,7 @@ class FindAndAddLanguageKeysCommand extends Command
         }
         
         uksort($keys, 'strnatcasecmp');
-        
+
         return $this->onlyExcept($keys);
     }
     
@@ -275,11 +275,11 @@ class FindAndAddLanguageKeysCommand extends Command
         
         uksort($newKeys, 'strnatcasecmp');
         
-//        foreach($newKeys as $key => $value){
-//            $newKeys[$key] = utf8_encode($value);
-//        }
+        foreach($newKeys as $key => $value){
+            $newKeys[$key] = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+        }
         
-        Storage::disk('localeFinder')->put("$locale.json", json_encode($newKeys, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        Storage::disk('localeFinder')->put("$locale.json", json_encode($newKeys, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     }
     
     /**
