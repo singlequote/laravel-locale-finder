@@ -123,16 +123,7 @@ class FindAndAddLanguageKeysCommand extends Command
         $path = config('locale-finder.search.folders', []);
 
         $functions = config('locale-finder.translation_methods', []);
-        $pattern = "[^\w|>]" . // Must not have an alphanum or _ or > before real method
-            "(" . implode('|', $functions) . ")" . // Must start with one of the functions
-            "\(" . // Match opening parenthese
-            "[\'\"]" . // Match " or '
-            "(" . // Start a new group to match:
-            "([^\1)]+)+" . // this is the key/value
-            ")" . // Close group
-            "[\'\"]" . // Closing quote
-            "[\),]";                            // Close parentheses or new parameter
-
+        
         $finder = new Finder();
         
         $finder->in($path)->exclude(config('locale-finder.search.exclude', []))
@@ -141,24 +132,29 @@ class FindAndAddLanguageKeysCommand extends Command
                         
         $this->info('> ' . $finder->count() . ' files found');
 
-        return $this->patternKeys($finder, $pattern);
+        return $this->patternKeys($finder, $functions);
     }
 
     /**
      * @param Finder $finder
-     * @param string $pattern
+     * @param string $functions
      * @return array
      */
-    private function patternKeys(Finder $finder, string $pattern): array
+    private function patternKeys(Finder $finder, array $functions): array
     {
         $keys = [];
         
         foreach ($finder as $file) {
-            $this->matchPatternKeysByContent($pattern, $keys, $file->getContents());
+            
+            if($file->getFileName() !== 'index.blade.php' || $file->getRelativePath() !== 'Freelance\resources\views\timesheets'){
+                continue;
+            }
+                        
+            $this->matchPatternKeysByContent($functions, $keys, $file->getContents());
         }
         
         foreach (config('locale-finder.search.files', []) as $file) {
-            $this->matchPatternKeysByContent($pattern, $keys, file_get_contents($file));
+            $this->matchPatternKeysByContent($functions, $keys, file_get_contents($file));
         }
         
         uksort($keys, 'strnatcasecmp');
@@ -167,28 +163,45 @@ class FindAndAddLanguageKeysCommand extends Command
     }
     
     /**
-     * @param string $pattern
+     * @param string $functions
      * @param array $keys
      * @param string $content
      * @return array
      */
-    private function matchPatternKeysByContent(string $pattern, array &$keys, string $content) : array
-    {
-        if (preg_match_all("/$pattern/siU", $content, $matches)) {
-            if (count($matches) < 2) {
-                return $keys;
-            }
-
-            foreach ($matches[2] as $key) {
-                if (strlen($key) < 2) {
-                    return $keys;
-                }
-                
-                $keys[$key] = '';
-            }
+    private function matchPatternKeysByContent(array $functions, array &$keys, string $content) : array
+    {        
+        foreach($functions as $function){
+            $this->searchForKeysInPattern($keys, $function, $content);
         }
         
         return $keys;
+    }
+    
+    /**
+     * @param array $keys
+     * @param string $function
+     * @param string $content
+     * @return array
+     */
+    private function searchForKeysInPattern(&$keys, string $function, string $content): array
+    {
+        $found = str($content)->betweenFirst("$function(", ")");
+            
+        if($found->replace(" ", "")->length() > 100){
+            return $keys;
+        }
+
+        $content = str($content)->replaceFirst("$function(", "replacedPattern(");
+        
+        $key = $found->ltrim("'\"")->rtrim("'\"");
+        
+        if($key->replace(' ', '')->contains(',[')){
+            $key = $key->beforeLast(",");
+        }
+        
+        $keys[$key->ltrim("'\"")->rtrim("'\"")->toString()] = "";
+        
+        return $this->searchForKeysInPattern($keys, $function, $content);
     }
     
 
@@ -203,7 +216,7 @@ class FindAndAddLanguageKeysCommand extends Command
         }
                         
         $only = explode(',', $this->option('only'));
-        
+                
         return collect($keys)->filter(function($value, $key) use($only){
             return $this->filterOnlyOnPrefix($key, $only);
         })->toArray();
