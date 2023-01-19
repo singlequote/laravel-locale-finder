@@ -144,15 +144,10 @@ class FindAndAddLanguageKeysCommand extends Command
     {
         $keys = [];
         
-        foreach ($finder as $file) {
-            
-            if($file->getFileName() !== 'index.blade.php' || $file->getRelativePath() !== 'Freelance\resources\views\timesheets'){
-                continue;
-            }
-                        
+        foreach ($finder as $file) {          
             $this->matchPatternKeysByContent($functions, $keys, $file->getContents());
         }
-        
+                
         foreach (config('locale-finder.search.files', []) as $file) {
             $this->matchPatternKeysByContent($functions, $keys, file_get_contents($file));
         }
@@ -174,6 +169,8 @@ class FindAndAddLanguageKeysCommand extends Command
             $this->searchForKeysInPattern($keys, $function, $content);
         }
         
+        
+        
         return $keys;
     }
     
@@ -185,21 +182,30 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function searchForKeysInPattern(&$keys, string $function, string $content): array
     {
-        $found = str($content)->betweenFirst("$function(", ")");
-            
-        if($found->replace(" ", "")->length() > 100){
+        if(!str($content)->contains("$function(")){
             return $keys;
         }
+        
+        $found = str($content)->betweenFirst("$function(", ")");
 
         $content = str($content)->replaceFirst("$function(", "replacedPattern(");
         
-        $key = $found->ltrim("'\"")->rtrim("'\"");
         
-        if($key->replace(' ', '')->contains(',[')){
-            $key = $key->beforeLast(",");
+        if(!$found->startsWith(["'", "\""]) || !$found->endsWith(["'", "\""])){
+            return $this->searchForKeysInPattern($keys, $function, $content);
+        }
+                
+        if($found->startsWith('"')){
+            $key = $found->betweenFirst('"', '"');
         }
         
-        $keys[$key->ltrim("'\"")->rtrim("'\"")->toString()] = "";
+        if($found->startsWith("'")){
+            $key = $found->betweenFirst("'", "'");
+        }
+        
+        $keyString = $key->ltrim("'\"")->rtrim("'\"")->toString();
+        
+        $keys[$keyString] = "";
         
         return $this->searchForKeysInPattern($keys, $function, $content);
     }
