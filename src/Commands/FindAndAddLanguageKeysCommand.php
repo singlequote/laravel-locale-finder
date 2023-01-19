@@ -197,6 +197,8 @@ class FindAndAddLanguageKeysCommand extends Command
             return $this->searchForKeysInPattern($keys, $function, $content);
         }
 
+
+
         if ($found->startsWith('"')) {
             $key = $found->betweenFirst('"', '"');
         }
@@ -204,6 +206,9 @@ class FindAndAddLanguageKeysCommand extends Command
         if ($found->startsWith("'")) {
             $key = $found->betweenFirst("'", "'");
         }
+
+
+
 
         $keyString = $key->ltrim("'\"")->rtrim("'\"")->toString();
 
@@ -223,9 +228,10 @@ class FindAndAddLanguageKeysCommand extends Command
             return false;
         }
 
-        if ($function !== 'trans_choice' && !$found->endsWith(["'", "\""])) {
+        if ($function !== 'trans_choice' && !$found->endsWith(["'", "\"", "]"])) {
             return false;
         }
+
 
         return true;
     }
