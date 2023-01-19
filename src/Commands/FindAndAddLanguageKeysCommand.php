@@ -8,10 +8,13 @@ use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Stringable;
 use Stichoza\GoogleTranslate\GoogleTranslate;
 use Symfony\Component\Finder\Finder;
 use const PHP_EOL;
+use function collect;
 use function config;
+use function count;
 use function str;
 
 class FindAndAddLanguageKeysCommand extends Command
@@ -185,16 +188,15 @@ class FindAndAddLanguageKeysCommand extends Command
         if(!str($content)->contains("$function(")){
             return $keys;
         }
-        
+                
         $found = str($content)->betweenFirst("$function(", ")");
-
+        
         $content = str($content)->replaceFirst("$function(", "replacedPattern(");
-        
-        
-        if(!$found->startsWith(["'", "\""]) || !$found->endsWith(["'", "\""])){
+                
+        if(!$this->runCheckOnKey($function, $found)){
             return $this->searchForKeysInPattern($keys, $function, $content);
         }
-                
+        
         if($found->startsWith('"')){
             $key = $found->betweenFirst('"', '"');
         }
@@ -210,6 +212,23 @@ class FindAndAddLanguageKeysCommand extends Command
         return $this->searchForKeysInPattern($keys, $function, $content);
     }
     
+    /**
+     * @param string $function
+     * @param Stringable $found
+     * @return bool
+     */
+    private function runCheckOnKey(string $function, Stringable $found): bool
+    {
+        if(!$found->startsWith(["'", "\""])){
+            return false;
+        }
+        
+        if($function !== 'trans_choice' && !$found->endsWith(["'", "\""])){
+            return false;
+        }
+        
+        return true;
+    }
 
     /**
      * @param array $keys
