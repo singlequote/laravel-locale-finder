@@ -37,7 +37,7 @@ class FindAndAddLanguageKeysCommand extends Command
     public function __construct(GoogleTranslate $googleTranslate)
     {
         $this->googleTranslate = $googleTranslate;
-        
+
         parent::__construct();
     }
 
@@ -50,13 +50,13 @@ class FindAndAddLanguageKeysCommand extends Command
             $this->error('The --locales option is required! Use as --locales=nl,en,de');
             return 0;
         }
-                
+
         $this->getTranslationFiles();
 
         $translationsKeys = $this->findKeysInFiles();
 
         $this->translateAndSaveNewKeys($translationsKeys);
-        
+
         $this->info("Finished");
 
         return 1;
@@ -88,7 +88,7 @@ class FindAndAddLanguageKeysCommand extends Command
     private function loadJsonTranslationFile(string $locale): array
     {
         $this->info("Loading: $locale");
-        
+
         $file = Storage::disk('localeFinder')->get("$locale.json");
 
         return json_decode($file, true) ?? [];
@@ -102,19 +102,19 @@ class FindAndAddLanguageKeysCommand extends Command
     private function loadPhpTranslationFile(string $locale, string $file): array
     {
         $this->info("Loading: $locale/$file");
-                
-        if($this->option('modules') && str($file)->contains('::')){
-            
+
+        if ($this->option('modules') && str($file)->contains('::')) {
+
             $hintPaths = Lang::getLoader()->namespaces();
-            
+
             $namespace = str($file)->before('::')->toString();
             $file = str($file)->after('::')->toString();
-                        
-            if(isset($hintPaths[$namespace])){
+
+            if (isset($hintPaths[$namespace])) {
                 return require "$hintPaths[$namespace]/$locale/$file.php";
             }
         }
-        
+
         return require Storage::disk('localeFinder')->path("$locale/$file.php");
     }
 
@@ -126,13 +126,13 @@ class FindAndAddLanguageKeysCommand extends Command
         $path = config('locale-finder.search.folders', []);
 
         $functions = config('locale-finder.translation_methods', []);
-        
+
         $finder = new Finder();
-        
+
         $finder->in($path)->exclude(config('locale-finder.search.exclude', []))
             ->name(config('locale-finder.search.file_extension', []))
             ->files();
-                        
+
         $this->info('> ' . $finder->count() . ' files found');
 
         return $this->patternKeys($finder, $functions);
@@ -146,37 +146,37 @@ class FindAndAddLanguageKeysCommand extends Command
     private function patternKeys(Finder $finder, array $functions): array
     {
         $keys = [];
-        
-        foreach ($finder as $file) {          
+
+        foreach ($finder as $file) {
             $this->matchPatternKeysByContent($functions, $keys, $file->getContents());
         }
-                
+
         foreach (config('locale-finder.search.files', []) as $file) {
             $this->matchPatternKeysByContent($functions, $keys, file_get_contents($file));
         }
-        
+
         uksort($keys, 'strnatcasecmp');
 
         return $this->onlyExcept($keys);
     }
-    
+
     /**
      * @param string $functions
      * @param array $keys
      * @param string $content
      * @return array
      */
-    private function matchPatternKeysByContent(array $functions, array &$keys, string $content) : array
-    {        
-        foreach($functions as $function){
+    private function matchPatternKeysByContent(array $functions, array &$keys, string $content): array
+    {
+        foreach ($functions as $function) {
             $this->searchForKeysInPattern($keys, $function, $content);
         }
-        
-        
-        
+
+
+
         return $keys;
     }
-    
+
     /**
      * @param array $keys
      * @param string $function
@@ -185,33 +185,33 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function searchForKeysInPattern(&$keys, string $function, string $content): array
     {
-        if(!str($content)->contains("$function(")){
+        if (!str($content)->contains("$function(")) {
             return $keys;
         }
-                
+
         $found = str($content)->betweenFirst("$function(", ")");
-        
+
         $content = str($content)->replaceFirst("$function(", "replacedPattern(");
-                
-        if(!$this->runCheckOnKey($function, $found)){
+
+        if (!$this->runCheckOnKey($function, $found)) {
             return $this->searchForKeysInPattern($keys, $function, $content);
         }
-        
-        if($found->startsWith('"')){
+
+        if ($found->startsWith('"')) {
             $key = $found->betweenFirst('"', '"');
         }
-        
-        if($found->startsWith("'")){
+
+        if ($found->startsWith("'")) {
             $key = $found->betweenFirst("'", "'");
         }
-        
+
         $keyString = $key->ltrim("'\"")->rtrim("'\"")->toString();
-        
+
         $keys[$keyString] = "";
-        
+
         return $this->searchForKeysInPattern($keys, $function, $content);
     }
-    
+
     /**
      * @param string $function
      * @param Stringable $found
@@ -219,14 +219,14 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function runCheckOnKey(string $function, Stringable $found): bool
     {
-        if(!$found->startsWith(["'", "\""])){
+        if (!$found->startsWith(["'", "\""])) {
             return false;
         }
-        
-        if($function !== 'trans_choice' && !$found->endsWith(["'", "\""])){
+
+        if ($function !== 'trans_choice' && !$found->endsWith(["'", "\""])) {
             return false;
         }
-        
+
         return true;
     }
 
@@ -234,35 +234,35 @@ class FindAndAddLanguageKeysCommand extends Command
      * @param array $keys
      * @return array
      */
-    private function onlyExcept(array $keys) : array
+    private function onlyExcept(array $keys): array
     {
-        if(!$this->option('only')){
+        if (!$this->option('only')) {
             return $keys;
         }
-                        
+
         $only = explode(',', $this->option('only'));
-                
-        return collect($keys)->filter(function($value, $key) use($only){
-            return $this->filterOnlyOnPrefix($key, $only);
-        })->toArray();
+
+        return collect($keys)->filter(function ($value, $key) use ($only) {
+                return $this->filterOnlyOnPrefix($key, $only);
+            })->toArray();
     }
-    
+
     /**
      * @param string $key
      * @param array $only
      * @param bool $keep
      * @return bool
      */
-    private function filterOnlyOnPrefix(string $key, array $only, bool $keep = false) : bool
-    {            
-        foreach($only as $prefix){
-            if(str($prefix)->endsWith('*') && str($key)->startsWith(str($prefix)->before('*')->toString())){
+    private function filterOnlyOnPrefix(string $key, array $only, bool $keep = false): bool
+    {
+        foreach ($only as $prefix) {
+            if (str($prefix)->endsWith('*') && str($key)->startsWith(str($prefix)->before('*')->toString())) {
                 $keep = true;
-            }elseif($prefix === $key){
+            } elseif ($prefix === $key) {
                 $keep = true;
             }
         }
-        
+
         return $keep;
     }
 
@@ -273,120 +273,120 @@ class FindAndAddLanguageKeysCommand extends Command
     private function translateAndSaveNewKeys(array $translationsKeys): void
     {
         foreach ($this->locales as $locale) {
-            
+
             $types = $this->parseKeys($locale, $translationsKeys);
 
-            foreach($types as $type => $keys){
-                
-                if($type === 'json'){
+            foreach ($types as $type => $keys) {
+
+                if ($type === 'json') {
                     $this->parseJsonKeys($locale, $keys);
                     continue;
                 }
-                
-                $this->parsePhpArrayKeys($locale, $type, $keys);                
+
+                $this->parsePhpArrayKeys($locale, $type, $keys);
             }
         }
     }
-    
+
     /**
      * @param string $locale
      * @param array $keys
      * @return void
      */
-    private function parseJsonKeys(string $locale, array $keys) : void
+    private function parseJsonKeys(string $locale, array $keys): void
     {
         $alreadyTranslated = $this->loadJsonTranslationFile($locale);
-        
+
         $old = $this->checkDiffMulti($alreadyTranslated, $keys);
 
-        $this->info("Removed ".count($old). " old keys from locale $locale");
-        
+        $this->info("Removed " . count($old) . " old keys from locale $locale");
+
         $existingKeys = $this->removeOldKeys($alreadyTranslated, $old);
-        
+
         $translationsKeys = $this->checkDiffMulti($keys, $existingKeys);
 
         $newKeysWithValues = $this->translateKeys($locale, $translationsKeys);
-        
-        $this->info("Found ".count($newKeysWithValues). " new keys for locale $locale");
-        
+
+        $this->info("Found " . count($newKeysWithValues) . " new keys for locale $locale");
+
         $newKeys = array_merge_recursive($existingKeys, $newKeysWithValues);
-        
+
         uksort($newKeys, 'strnatcasecmp');
-        
-        foreach($newKeys as $key => $value){
+
+        foreach ($newKeys as $key => $value) {
             $newKeys[$key] = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
         }
-        
+
         Storage::disk('localeFinder')->put("$locale.json", json_encode($newKeys, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     }
-    
+
     /**
      * @param string $locale
      * @param string $file
      * @param array $keys
      * @return void
      */
-    private function parsePhpArrayKeys(string $locale, string $file, array $keys) : void
+    private function parsePhpArrayKeys(string $locale, string $file, array $keys): void
     {
         $alreadyTranslated = $this->loadPhpTranslationFile($locale, $file);
-        
+
         $old = $this->checkDiffMulti($alreadyTranslated, $keys);
-        
-        $this->info("Removed ".count($old). " old keys from locale $locale");
-        
+
+        $this->info("Removed " . count($old) . " old keys from locale $locale");
+
         $existingKeys = $this->removeOldKeys($alreadyTranslated, $old);
-        
+
         $translationsKeys = $this->checkDiffMulti($keys, $existingKeys);
-        
+
         $newKeysWithValues = $this->translateKeys($locale, $translationsKeys);
 
-        $this->info("Found ".count($newKeysWithValues). " new keys for locale $locale");
-        
-        $newKeys = array_merge_recursive($existingKeys, $newKeysWithValues);
-                     
-        uksort($newKeys, 'strnatcasecmp');
-        
-        $export = $this->varexport($newKeys);
-        
-        $code = "<?php ".PHP_EOL.PHP_EOL."return $export;";
+        $this->info("Found " . count($newKeysWithValues) . " new keys for locale $locale");
 
-        if($this->option('modules') && str($file)->contains('::')){
+        $newKeys = array_merge_recursive($existingKeys, $newKeysWithValues);
+
+        uksort($newKeys, 'strnatcasecmp');
+
+        $export = $this->varexport($newKeys);
+
+        $code = "<?php " . PHP_EOL . PHP_EOL . "return $export;";
+
+        if ($this->option('modules') && str($file)->contains('::')) {
             $this->parsePhpModuleKeys($locale, $file, $code);
-        }else{
+        } else {
             file_put_contents(Storage::disk('localeFinder')->path("$locale/$file.php"), $code);
-        }        
+        }
     }
-    
+
     /**
      * @param string $locale
      * @param string $parent
      * @param string $code
      * @return void
      */
-    private function parsePhpModuleKeys(string $locale, string $parent, string $code) : void
+    private function parsePhpModuleKeys(string $locale, string $parent, string $code): void
     {
         $hintPaths = Lang::getLoader()->namespaces();
-            
+
         $namespace = str($parent)->before('::')->toString();
         $file = str($parent)->after('::')->toString();
 
         file_put_contents("$hintPaths[$namespace]/$locale/$file.php", $code);
     }
-    
+
     /**
      * @param string $locale
      * @param array $newKeysFound
      * @return array
      */
-    private function parseKeys(string $locale, array $newKeysFound) : array
+    private function parseKeys(string $locale, array $newKeysFound): array
     {
         $items = [];
-        
+
         foreach ($newKeysFound as $key => $value) {
-             
+
             $parent = Str::before($key, '.');
             $child = Str::after($key, '.');
-            
+
             if (!Str::contains(rtrim($key, '.'), ['.', "::"]) || Str::startsWith($child, ' ')) {
                 $items['json'][$key] = $value;
                 continue;
@@ -394,14 +394,14 @@ class FindAndAddLanguageKeysCommand extends Command
 
             if ($this->parentExists($locale, $parent)) {
                 $parsed = $this->createParentKeys($child, $value, []);
-                
+
                 $items[$parent] = array_merge_recursive($parsed, $items[$parent] ?? []);
-            }else{
+            } else {
                 $items['json'][$key] = $value;
                 $this->error("Translation file $parent does not exists. Adding to json file!");
             }
         }
-                
+
         return $items;
     }
 
@@ -411,21 +411,21 @@ class FindAndAddLanguageKeysCommand extends Command
      * @return array
      */
     private function createParentKeys(string $key, string $value): array
-    {      
+    {
         $parent = Str::before($key, '.');
         $child = Str::after($key, '.');
-        
+
         if (!Str::contains(rtrim($key, '.'), '.') || Str::startsWith($child, ' ')) {
             return [$key => $value];
         }
-        
+
         if (Str::contains(rtrim($child, '.'), '.')) {
-                        
+
             $child = $this->createParentKeys($child, $value);
-        }else{
+        } else {
             $child = [$child => $value];
         }
-        
+
         return [$parent => $child];
     }
 
@@ -436,14 +436,14 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function parentExists(string $locale, string $parent): bool
     {
-        if($this->option('modules') && str($parent)->contains('::')){
-            
+        if ($this->option('modules') && str($parent)->contains('::')) {
+
             $hintPaths = Lang::getLoader()->namespaces();
-            
+
             $namespace = str($parent)->before('::')->toString();
             $parent = str($parent)->after('::')->toString();
-            
-            if(isset($hintPaths[$namespace])){
+
+            if (isset($hintPaths[$namespace])) {
                 return $this->createOrStay("$hintPaths[$namespace]/$locale", "$hintPaths[$namespace]/$locale/$parent.php");
             }
         }
@@ -455,23 +455,23 @@ class FindAndAddLanguageKeysCommand extends Command
      * @param string $path
      * @return bool
      */
-    private function createOrStay(string $root, string $path) : bool
+    private function createOrStay(string $root, string $path): bool
     {
         $exists = File::exists($path);
-        
-        if(!$this->option('create') || $exists){
+
+        if (!$this->option('create') || $exists) {
             return $exists;
         }
-        
+
         $export = $this->varexport([]);
-        
-        if(!File::isDirectory($root)){
+
+        if (!File::isDirectory($root)) {
             File::makeDirectory($root, 0755, true);
         }
-        
-        return File::put($path, "<?php ".PHP_EOL.PHP_EOL."return $export;");
+
+        return File::put($path, "<?php " . PHP_EOL . PHP_EOL . "return $export;");
     }
-    
+
     /**
      * @param string $locale
      * @param array $keys
@@ -566,54 +566,54 @@ class FindAndAddLanguageKeysCommand extends Command
 
         return $translated;
     }
-    
+
     /**
      * @param array $current
      * @param array $old
      * @return array
      */
-    private function removeOldKeys(array $current, array $old) : array
+    private function removeOldKeys(array $current, array $old): array
     {
-        foreach($old as $key => $value){
-            
-            if(isset($current[$key]) && is_array($current[$key])){
+        foreach ($old as $key => $value) {
+
+            if (isset($current[$key]) && is_array($current[$key])) {
                 $current[$key] = $this->removeOldKeys($current[$key], $old[$key]);
-                
-                if(!count($current[$key])){
+
+                if (!count($current[$key])) {
                     unset($current[$key]);
                 }
-                
+
                 continue;
             }
-            
-            if(isset($current[$key])){
+
+            if (isset($current[$key])) {
                 unset($current[$key]);
             }
         }
-        
+
         return $current;
     }
-    
+
     /**
      * @param array $expression
      * @return string
      */
-    private function varexport(array $expression) : string
+    private function varexport(array $expression): string
     {
         $export = var_export($expression, true);
-        
+
         $patterns = [
             "/array \(/" => '[',
             "/^([ ]*)\)(,?)$/m" => '$1]$2',
             "/=>[ ]?\n[ ]+\[/" => '=> [',
             "/([ ]*)(\'[^\']+\') => ([\[\'])/" => '$1$2 => $3',
         ];
-        
+
         $replace = preg_replace(array_keys($patterns), array_values($patterns), $export);
 
         return $replace;
     }
-    
+
     /**
      * 
      * @param array $array1
@@ -623,20 +623,20 @@ class FindAndAddLanguageKeysCommand extends Command
     private function checkDiffMulti(array $array1, array $array2): array
     {
         $result = [];
-        
-        foreach($array1 as $key => $value){
 
-            if(isset($array2[$key]) && is_array($value) && is_array($array2[$key])){
-             
+        foreach ($array1 as $key => $value) {
+
+            if (isset($array2[$key]) && is_array($value) && is_array($array2[$key])) {
+
                 $result[$key] = $this->checkDiffMulti($array1[$key], $array2[$key]);
                 continue;
             }
-                        
-            if(!isset($array2[$key])){
+
+            if (!isset($array2[$key])) {
                 $result[$key] = $value;
             }
         }
-        
+
         return $result;
     }
 }
