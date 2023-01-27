@@ -156,86 +156,10 @@ class FindAndAddLanguageKeysCommand extends Command
         }
 
         uksort($keys, 'strnatcasecmp');
-
+                
         return $this->onlyExcept($keys);
     }
-
-    /**
-     * @param string $functions
-     * @param array $keys
-     * @param string $content
-     * @return array
-     */
-    private function matchPatternKeysByContent(array $functions, array &$keys, string $content): array
-    {
-        foreach ($functions as $function) {
-            $this->searchForKeysInPattern($keys, $function, $content);
-        }
-
-
-
-        return $keys;
-    }
-
-    /**
-     * @param array $keys
-     * @param string $function
-     * @param string $content
-     * @return array
-     */
-    private function searchForKeysInPattern(&$keys, string $function, string $content): array
-    {
-        if (!str($content)->contains("$function(")) {
-            return $keys;
-        }
-
-        $found = str($content)->betweenFirst("$function(", ")");
-
-        $content = str($content)->replaceFirst("$function(", "replacedPattern(");
-
-        if (!$this->runCheckOnKey($function, $found)) {
-            return $this->searchForKeysInPattern($keys, $function, $content);
-        }
-
-
-
-        if ($found->startsWith('"')) {
-            $key = $found->betweenFirst('"', '"');
-        }
-
-        if ($found->startsWith("'")) {
-            $key = $found->betweenFirst("'", "'");
-        }
-
-
-
-
-        $keyString = $key->ltrim("'\"")->rtrim("'\"")->toString();
-
-        $keys[$keyString] = "";
-
-        return $this->searchForKeysInPattern($keys, $function, $content);
-    }
-
-    /**
-     * @param string $function
-     * @param Stringable $found
-     * @return bool
-     */
-    private function runCheckOnKey(string $function, Stringable $found): bool
-    {
-        if (!$found->startsWith(["'", "\""])) {
-            return false;
-        }
-
-        if ($function !== 'trans_choice' && !$found->endsWith(["'", "\"", "]"])) {
-            return false;
-        }
-
-
-        return true;
-    }
-
+    
     /**
      * @param array $keys
      * @return array
@@ -249,8 +173,63 @@ class FindAndAddLanguageKeysCommand extends Command
         $only = explode(',', $this->option('only'));
 
         return collect($keys)->filter(function ($value, $key) use ($only) {
-                return $this->filterOnlyOnPrefix($key, $only);
-            })->toArray();
+            return $this->filterOnlyOnPrefix($key, $only);
+        })->toArray();
+    }
+
+
+    /**
+     * @param string $functions
+     * @param array $keys
+     * @param string $content
+     * @return array
+     */
+    private function matchPatternKeysByContent(array $functions, array &$keys, string $content): array
+    {
+        $minified = str($content)->replace(["\r", "\n", "  "], '<br>')->toString();
+        
+        foreach ($functions as $function) {
+            $this->searchForKeysInPattern($keys, $function, $minified);
+        }
+
+        return $keys;
+    }
+
+    /**
+     * @param array $keys
+     * @param string $function
+     * @param string $content
+     * @return array
+     */
+    private function searchForKeysInPattern(&$keys, string $function, string $content): array
+    {
+        $key = null;
+        
+        if (!str($content)->contains("$function(")) {
+            return $keys;
+        }
+
+        $found = str($content)->betweenFirst("$function(", ")");
+
+        $content = str($content)->replaceFirst("$function(", "replacedPattern(");
+      
+        if ($found->startsWith('"')) {
+            $key = $found->betweenFirst('"', '"');
+        }
+
+        if ($found->startsWith("'")) {
+            $key = $found->betweenFirst("'", "'");
+        }
+        
+        if (!$key) {
+            return $this->searchForKeysInPattern($keys, $function, $content);
+        }     
+
+        $keyString = $key->ltrim("'\"")->rtrim("'\"")->toString();
+                
+        $keys[$keyString] = "";
+        
+        return $this->searchForKeysInPattern($keys, $function, $content);
     }
 
     /**
@@ -566,10 +545,14 @@ class FindAndAddLanguageKeysCommand extends Command
             $this->googleTranslate->setTarget($locale);
             $translated = $this->googleTranslate->translate($key);
         } catch (Exception $exception) {
-            Log::warning('Google translate issue with ' . $key . ': ' . $exception->getMessage());
+            $this->error('Google translate issue with ' . $key . ': ' . $exception->getMessage());
             $translated = $key;
         }
-
+        
+        if(!$translated){
+            $translated = $key;
+        }
+        
         return $translated;
     }
 
