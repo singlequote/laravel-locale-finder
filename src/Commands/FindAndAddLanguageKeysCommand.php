@@ -1,25 +1,25 @@
 <?php
+
 namespace SingleQuote\LocaleFinder\Commands;
 
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Lang;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Support\Stringable;
 use Stichoza\GoogleTranslate\GoogleTranslate;
 use Symfony\Component\Finder\Finder;
-use const PHP_EOL;
+
 use function collect;
 use function config;
 use function count;
 use function str;
 
+use const PHP_EOL;
+
 class FindAndAddLanguageKeysCommand extends Command
 {
-
     /**
      * @var  string
      */
@@ -127,23 +127,25 @@ class FindAndAddLanguageKeysCommand extends Command
 
         $functions = config('locale-finder.translation_methods', []);
 
-        $finder = new Finder();
+        if(count($path) > 0) {
+            $finder = new Finder();
 
-        $finder->in($path)->exclude(config('locale-finder.search.exclude', []))
-            ->name(config('locale-finder.search.file_extension', []))
-            ->files();
+            $finder->in($path)->exclude(config('locale-finder.search.exclude', []))
+                ->name(config('locale-finder.search.file_extension', []))
+                ->files();
 
-        $this->info('> ' . $finder->count() . ' files found');
+            $this->info('> ' . $finder->count() . ' files found');
+        }
 
-        return $this->patternKeys($finder, $functions);
+        return $this->patternKeys($finder ?? [], $functions);
     }
 
     /**
-     * @param Finder $finder
-     * @param string $functions
+     * @param array|Finder $finder
+     * @param array $functions
      * @return array
      */
-    private function patternKeys(Finder $finder, array $functions): array
+    private function patternKeys(array|Finder $finder, array $functions): array
     {
         $keys = [];
 
@@ -156,7 +158,7 @@ class FindAndAddLanguageKeysCommand extends Command
         }
 
         uksort($keys, 'strnatcasecmp');
-
+        dump($keys);
         return $this->onlyExcept($keys);
     }
 
@@ -173,8 +175,8 @@ class FindAndAddLanguageKeysCommand extends Command
         $only = explode(',', $this->option('only'));
 
         return collect($keys)->filter(function ($value, $key) use ($only) {
-                return $this->filterOnlyOnPrefix($key, $only);
-            })->toArray();
+            return $this->filterOnlyOnPrefix($key, $only);
+        })->toArray();
     }
 
     /**
@@ -185,32 +187,51 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function matchPatternKeysByContent(array $functions, array &$keys, string $content): array
     {
-        $minified = str($content)->replace(["\r", "\n", "  "], '<br>')->toString();
+        $minified = str($content)->replace(["\r", "\n", "  "], '-')->toString();
 
         foreach ($functions as $function) {
-            $this->searchForKeysInPattern($keys, $function, $minified);
+            $minified1 = $this->replaceMatchingBeforeFinding($function, $minified, '"');
+            $minified2 = $this->replaceMatchingBeforeFinding($function, $minified1, "'");
+            $minified = $this->replaceMatchingBeforeFinding($function, $minified2, "]");
+        }
+
+        foreach ($functions as $function) {
+            $this->searchForKeysInPattern($keys, $minified);
         }
 
         return $keys;
     }
 
     /**
-     * @param array $keys
      * @param string $function
+     * @param string $content
+     * @param string $pattern
+     * @return string
+     */
+    private function replaceMatchingBeforeFinding(string $function, string &$content, string $pattern): string
+    {
+        return str($content)
+            ->replace("$function($pattern", "translationkeyFindedStart($pattern")
+            ->replace("$pattern)", "{$pattern}translationkeyFindedEnd")
+            ->value;
+    }
+
+    /**
+     * @param array $keys
      * @param string $content
      * @return array
      */
-    private function searchForKeysInPattern(&$keys, string $function, string $content): array
+    private function searchForKeysInPattern(array &$keys, string $content): array
     {
         $key = null;
 
-        if (!str($content)->contains("$function(")) {
+        if (!str($content)->contains("translationkeyFindedStart(")) {
             return $keys;
         }
 
-        $found = str($content)->betweenFirst("$function(", ")");
+        $found = str($content)->betweenFirst("translationkeyFindedStart(", "translationkeyFindedEnd");
 
-        $content = str($content)->replaceFirst("$function(", "replacedPattern(");
+        $newContent = str($content)->replaceFirst("translationkeyFindedStart(", "replacedPattern(");
 
         if ($found->startsWith('"')) {
             $key = $found->betweenFirst('"', '"');
@@ -220,15 +241,15 @@ class FindAndAddLanguageKeysCommand extends Command
             $key = $found->betweenFirst("'", "'");
         }
 
-        if (!$key) {
-            return $this->searchForKeysInPattern($keys, $function, $content);
+        if (!$key || strlen($key) === 0) {
+            return $this->searchForKeysInPattern($keys, $newContent);
         }
 
         $keyString = $key->ltrim("'\"")->rtrim("'\"")->toString();
 
         $keys[$keyString] = "";
 
-        return $this->searchForKeysInPattern($keys, $function, $content);
+        return $this->searchForKeysInPattern($keys, $newContent);
     }
 
     /**
@@ -548,7 +569,7 @@ class FindAndAddLanguageKeysCommand extends Command
             $translated = $key;
         }
 
-        if (!$translated) {
+        if(!$translated) {
             $translated = $key;
         }
 
@@ -603,7 +624,7 @@ class FindAndAddLanguageKeysCommand extends Command
     }
 
     /**
-     * 
+     *
      * @param array $array1
      * @param array $array2
      * @return array
