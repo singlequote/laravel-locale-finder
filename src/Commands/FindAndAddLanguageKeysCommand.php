@@ -1,5 +1,4 @@
 <?php
-
 namespace SingleQuote\LocaleFinder\Commands;
 
 use Exception;
@@ -10,16 +9,15 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Stichoza\GoogleTranslate\GoogleTranslate;
 use Symfony\Component\Finder\Finder;
-
+use const PHP_EOL;
 use function collect;
 use function config;
 use function count;
 use function str;
 
-use const PHP_EOL;
-
 class FindAndAddLanguageKeysCommand extends Command
 {
+
     /**
      * @var  string
      */
@@ -127,7 +125,7 @@ class FindAndAddLanguageKeysCommand extends Command
 
         $functions = config('locale-finder.translation_methods', []);
 
-        if(count($path) > 0) {
+        if (count($path) > 0) {
             $finder = new Finder();
 
             $finder->in($path)->exclude(config('locale-finder.search.exclude', []))
@@ -158,7 +156,7 @@ class FindAndAddLanguageKeysCommand extends Command
         }
 
         uksort($keys, 'strnatcasecmp');
-        dump($keys);
+
         return $this->onlyExcept($keys);
     }
 
@@ -175,8 +173,8 @@ class FindAndAddLanguageKeysCommand extends Command
         $only = explode(',', $this->option('only'));
 
         return collect($keys)->filter(function ($value, $key) use ($only) {
-            return $this->filterOnlyOnPrefix($key, $only);
-        })->toArray();
+                return $this->filterOnlyOnPrefix($key, $only);
+            })->toArray();
     }
 
     /**
@@ -211,8 +209,8 @@ class FindAndAddLanguageKeysCommand extends Command
     private function replaceMatchingBeforeFinding(string $function, string &$content, string $pattern): string
     {
         return str($content)
-            ->replace("$function($pattern", "translationkeyFindedStart($pattern")
-            ->replace("$pattern)", "{$pattern}translationkeyFindedEnd")
+                ->replace("$function($pattern", "translationkeyFindedStart($pattern")
+                ->replace("$pattern)", "{$pattern}translationkeyFindedEnd")
             ->value;
     }
 
@@ -569,7 +567,7 @@ class FindAndAddLanguageKeysCommand extends Command
             $translated = $key;
         }
 
-        if(!$translated) {
+        if (!$translated) {
             $translated = $key;
         }
 
