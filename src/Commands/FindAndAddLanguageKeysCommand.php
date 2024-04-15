@@ -373,7 +373,11 @@ class FindAndAddLanguageKeysCommand extends Command
         $namespace = str($parent)->before('::')->toString();
         $file = str($parent)->after('::')->toString();
 
-        file_put_contents("$hintPaths[$namespace]/$locale/$file.php", $code);
+        try {
+            file_put_contents("$hintPaths[$namespace]/$locale/$file.php", $code);
+        } catch (\Throwable $ex) {
+            $this->error("Key $namespace not found");
+        }
     }
 
     /**
