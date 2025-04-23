@@ -1,1 +1,5 @@
 /nbproject
+/vendor
+/.idea
+/.vscode
+/composer.lock
