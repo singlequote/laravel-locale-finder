@@ -27,14 +27,13 @@ class FindAndAddLanguageKeysCommand extends Command
      * @var  string
      */
     protected $description = 'Automatically find, translate and save missing translation keys.';
-    
+
     /**
      * @var GoogleTranslate
      */
     private GoogleTranslate $googleTranslate;
-
     private array $reservedKeys = [];
-    
+
     /**
      * @param GoogleTranslate $googleTranslate
      */
@@ -221,11 +220,36 @@ class FindAndAddLanguageKeysCommand extends Command
     }
 
     /**
+     * Zoekt naar vertaalsleutels in een string met een reguliere expressie.
+     *
+     * @param string $content De content om in te zoeken.
+     * @return array Een array met de gevonden sleutels.
+     */
+    private function searchForKeysInPattern(array &$keys, string $content): array
+    {
+        // Regex die zoekt naar translationkeyFindedStart('key') of translationkeyFindedStart("key").
+        // Houdt rekening met escaped quotes (\' of \") en negeert eventuele extra parameters.
+        $pattern = "/translationkeyFindedStart\(\s*(?:'((?:\\\\'|[^'])*)'|\"((?:\\\\\"|[^\"])*)\")/";
+
+        preg_match_all($pattern, $content, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $match) {
+            // De gevonden sleutel staat in capture group 1 (voor ') of 2 (voor ").
+            // We gebruiken stripslashes om de escaped quotes weer normaal te maken.
+            $key = stripslashes($match[1] ?: $match[2]);
+            $keys[$key] = ""; // Voeg de sleutel toe aan de array
+        }
+
+        return array_keys($keys); // Retourneer een lijst van unieke sleutels
+    }
+    
+    
+    /**
      * @param array $keys
      * @param string $content
      * @return array
      */
-    private function searchForKeysInPattern(array &$keys, string $content): array
+    private function searchForKeysInPattern2(array &$keys, string $content): array
     {
         $key = null;
 
@@ -491,9 +515,8 @@ class FindAndAddLanguageKeysCommand extends Command
      * @return array
      */
     private function translateKeys(string $locale, array $keys): array
-    {
+    {        
         foreach ($keys as $keyIndex => $keyValue) {
-            $this->reservedKeys = [];
             if ($keyValue === '...') {
                 continue;
             }
@@ -502,7 +525,7 @@ class FindAndAddLanguageKeysCommand extends Command
                 $keys[$keyIndex] = $this->translateKeys($locale, $keyValue);
                 continue;
             }
-                        
+
             if (Str::contains($keyIndex, ":")) {
                 $shouldTranslate = $this->removeVariables($keyIndex);
             } else {
@@ -526,11 +549,11 @@ class FindAndAddLanguageKeysCommand extends Command
     {
         if (Str::contains($string, ":")) {
             $variable = Str::betweenFirst($string, ":", " ");
-            
+
             $unique = uniqid();
             $this->reservedKeys[$unique] = $variable;
-            
-            $replaced = $this->replace(":$variable", "{{".$unique."}}", $string);
+
+            $replaced = $this->replace(":$variable", "{{" . $unique . "}}", $string);
 
             return $this->removeVariables($replaced);
         }
@@ -545,9 +568,9 @@ class FindAndAddLanguageKeysCommand extends Command
     private function parseVariables(string $string): string
     {
         if (Str::contains($string, "{{")) {
-                        
+
             $variable = Str::betweenFirst($string, "{{", "}}");
-                        
+
             $replaced = $this->replace("{{" . $variable . "}}", ":" . $this->reservedKeys[$variable], $string);
 
             return $this->parseVariables($replaced);
