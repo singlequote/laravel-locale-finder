@@ -27,8 +27,14 @@ class FindAndAddLanguageKeysCommand extends Command
      * @var  string
      */
     protected $description = 'Automatically find, translate and save missing translation keys.';
+    
+    /**
+     * @var GoogleTranslate
+     */
     private GoogleTranslate $googleTranslate;
 
+    private array $reservedKeys = [];
+    
     /**
      * @param GoogleTranslate $googleTranslate
      */
@@ -487,6 +493,7 @@ class FindAndAddLanguageKeysCommand extends Command
     private function translateKeys(string $locale, array $keys): array
     {
         foreach ($keys as $keyIndex => $keyValue) {
+            $this->reservedKeys = [];
             if ($keyValue === '...') {
                 continue;
             }
@@ -495,7 +502,7 @@ class FindAndAddLanguageKeysCommand extends Command
                 $keys[$keyIndex] = $this->translateKeys($locale, $keyValue);
                 continue;
             }
-
+                        
             if (Str::contains($keyIndex, ":")) {
                 $shouldTranslate = $this->removeVariables($keyIndex);
             } else {
@@ -519,7 +526,11 @@ class FindAndAddLanguageKeysCommand extends Command
     {
         if (Str::contains($string, ":")) {
             $variable = Str::betweenFirst($string, ":", " ");
-            $replaced = $this->replace(":$variable", "{{" . base64_encode($variable) . "}}", $string);
+            
+            $unique = uniqid();
+            $this->reservedKeys[$unique] = $variable;
+            
+            $replaced = $this->replace(":$variable", "{{".$unique."}}", $string);
 
             return $this->removeVariables($replaced);
         }
@@ -534,9 +545,10 @@ class FindAndAddLanguageKeysCommand extends Command
     private function parseVariables(string $string): string
     {
         if (Str::contains($string, "{{")) {
+                        
             $variable = Str::betweenFirst($string, "{{", "}}");
-
-            $replaced = $this->replace("{{" . $variable . "}}", ":" . base64_decode($variable), $string);
+                        
+            $replaced = $this->replace("{{" . $variable . "}}", ":" . $this->reservedKeys[$variable], $string);
 
             return $this->parseVariables($replaced);
         }
