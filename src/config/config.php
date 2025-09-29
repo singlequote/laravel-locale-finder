@@ -73,4 +73,20 @@ return [
         '__',
         'trans_choice',
     ],
+
+    /*
+      |--------------------------------------------------------------------------
+      | If true - all the keys will be overwritten, even those that are already
+      |--------------------------------------------------------------------------
+      |
+     */
+    'overwrite_existing'   => env('LOCALE_FINDER_OVERWRITE', false),
+
+    /*
+      |--------------------------------------------------------------------------
+      | If true, only JSON keys will be generated; all PHP arrays are skipped
+      |--------------------------------------------------------------------------
+      |
+     */
+    'only_json_translations' => env('LOCALE_FINDER_ONLY_JSON', false),
 ];

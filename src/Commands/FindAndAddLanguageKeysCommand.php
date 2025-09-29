@@ -45,7 +45,7 @@ class FindAndAddLanguageKeysCommand extends Command
     }
 
     /**
-     * @return void
+     * @return int
      */
     public function handle(): int
     {
@@ -183,7 +183,7 @@ class FindAndAddLanguageKeysCommand extends Command
     }
 
     /**
-     * @param string $functions
+     * @param array $functions
      * @param array $keys
      * @param string $content
      * @return array
@@ -328,6 +328,8 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function parseJsonKeys(string $locale, array $keys): void
     {
+        $overwrite = config('locale-finder.overwrite_existing', false);
+
         $alreadyTranslated = $this->loadJsonTranslationFile($locale);
 
         $old = $this->checkDiffMulti($alreadyTranslated, $keys);
@@ -336,13 +338,25 @@ class FindAndAddLanguageKeysCommand extends Command
 
         $existingKeys = $this->removeOldKeys($alreadyTranslated, $old);
 
-        $translationsKeys = $this->checkDiffMulti($keys, $existingKeys);
+        if ($overwrite) {
+            // overwrite all
+            $translationsKeys = $keys;
+        } else {
+            // only those that are not in the existing ones
+            $translationsKeys = collect($keys)
+                ->except(array_keys($existingKeys))
+                ->toArray();
+        }
 
         $newKeysWithValues = $this->translateKeys($locale, $translationsKeys);
 
         $this->info("Found " . count($newKeysWithValues) . " new keys for locale $locale");
 
-        $newKeys = array_merge_recursive($existingKeys, $newKeysWithValues);
+        if ($overwrite) {
+            $newKeys = array_merge($existingKeys, $newKeysWithValues);
+        } else {
+            $newKeys = $existingKeys + $newKeysWithValues;
+        }
 
         uksort($newKeys, 'strnatcasecmp');
 
@@ -361,6 +375,8 @@ class FindAndAddLanguageKeysCommand extends Command
      */
     private function parsePhpArrayKeys(string $locale, string $file, array $keys): void
     {
+        $overwrite = config('locale-finder.overwrite_existing', false);
+
         $alreadyTranslated = $this->loadPhpTranslationFile($locale, $file);
 
         $old = $this->checkDiffMulti($alreadyTranslated, $keys);
@@ -369,13 +385,23 @@ class FindAndAddLanguageKeysCommand extends Command
 
         $existingKeys = $this->removeOldKeys($alreadyTranslated, $old);
 
-        $translationsKeys = $this->checkDiffMulti($keys, $existingKeys);
+        if ($overwrite) {
+            $translationsKeys = $keys;
+        } else {
+            $translationsKeys = collect($keys)
+                ->except(array_keys($existingKeys))
+                ->toArray();
+        }
 
         $newKeysWithValues = $this->translateKeys($locale, $translationsKeys);
 
         $this->info("Found " . count($newKeysWithValues) . " new keys for locale $locale");
 
-        $newKeys = array_merge_recursive($existingKeys, $newKeysWithValues);
+        if ($overwrite) {
+            $newKeys = array_merge($existingKeys, $newKeysWithValues);
+        } else {
+            $newKeys = $existingKeys + $newKeysWithValues;
+        }
 
         uksort($newKeys, 'strnatcasecmp');
 
@@ -426,6 +452,10 @@ class FindAndAddLanguageKeysCommand extends Command
 
             if (!Str::contains(rtrim($key, '.'), ['.', "::"]) || Str::startsWith($child, ' ')) {
                 $items['json'][$key] = $value;
+                continue;
+            }
+
+            if (config('locale-finder.only_json_translations', false)) {
                 continue;
             }
 
@@ -489,6 +519,7 @@ class FindAndAddLanguageKeysCommand extends Command
     }
 
     /**
+     * @param string $root
      * @param string $path
      * @return bool
      */
