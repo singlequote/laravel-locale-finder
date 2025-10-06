@@ -1,13 +1,13 @@
 
 # Laravel Translation Finder
-Find all translation keys in your blades, scripts, files etc. and translate to the given language.
+This package scans your project files (like Blade, PHP, and script files) for translation keys (__("...") or @lang("...")), automatically translates them into your specified languages using an external translation service, and saves them to the correct language files. It also helps maintain clean language files by removing keys that are no longer in use.
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/singlequote/laravel-locale-finder.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-locale-finder)
 [![Total Downloads](https://img.shields.io/packagist/dt/singlequote/laravel-locale-finder.svg?style=flat-square)](https://packagist.org/packages/singlequote/laravel-locale-finder)
 
 
 ### Installation
-Install the package using composer. Save the package to the dev section for the package is only needed when developing your project. If you need it on your production, remove the `--dev` option.
+Install the package via Composer. It's recommended to install it as a development dependency since it's typically only used during development.
 ```console
 composer require singlequote/laravel-locale-finder --dev
 ```
